@@ -1,295 +1,250 @@
 <template>
-  <div>
+  <div class="finder-share">
     <header-bar showMenu showLogo>
-      <title />
-
       <action
-        v-if="fileStore.selectedCount"
+        v-if="req?.isDir && !error"
+        icon="check_circle"
+        :label="t('buttons.selectMultiple')"
+        @action="toggleMultipleSelection"
+      />
+      <button
+        v-if="req && !error"
+        class="finder-tool"
+        :aria-label="t('buttons.copyDownloadLinkToClipboard')"
+        :title="t('buttons.copyDownloadLinkToClipboard')"
+        @click="copyToClipboard(isSingleFile() ? linkSelected() : link)"
+      >
+        <FinderIcon name="share" />
+      </button>
+      <action
+        v-if="fileStore.selectedCount && !error"
         icon="file_download"
         :label="t('buttons.download')"
         @action="download"
         :counter="fileStore.selectedCount"
       />
-      <button
-        v-if="isSingleFile()"
-        class="action copy-clipboard"
-        :aria-label="t('buttons.copyDownloadLinkToClipboard')"
-        :data-title="t('buttons.copyDownloadLinkToClipboard')"
-        @click="copyToClipboard(linkSelected())"
-      >
-        <i class="material-icons">content_paste</i>
-      </button>
-      <action
-        icon="check_circle"
-        :label="t('buttons.selectMultiple')"
-        @action="toggleMultipleSelection"
-      />
     </header-bar>
 
     <breadcrumbs :base="'/share/' + hash" />
 
-    <div v-if="layoutStore.loading">
-      <h2 class="message delayed" style="padding-top: 3em !important">
-        <div class="spinner">
-          <div class="bounce1"></div>
-          <div class="bounce2"></div>
-          <div class="bounce3"></div>
-        </div>
-        <span>{{ t("files.loading") }}</span>
-      </h2>
+    <div v-if="layoutStore.loading" class="share-loading" role="status">
+      <div class="spinner">
+        <div class="bounce1"></div>
+        <div class="bounce2"></div>
+        <div class="bounce3"></div>
+      </div>
+      <span>{{ t("files.loading") }}</span>
     </div>
     <div v-else-if="error">
-      <div v-if="error.status === 401">
-        <div class="card floating" id="password" style="z-index: 9999999">
-          <div v-if="attemptedPasswordLogin" class="share__wrong__password">
+      <template v-if="error.status === 401">
+        <form
+          class="card floating"
+          id="password"
+          @submit.prevent="fetchData"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="t('login.password')"
+        >
+          <div
+            v-if="attemptedPasswordLogin"
+            class="share__wrong__password"
+            role="alert"
+          >
             {{ t("login.wrongCredentials") }}
           </div>
           <div class="card-title">
             <h2>{{ t("login.password") }}</h2>
           </div>
-
           <div class="card-content">
             <input
               v-focus
               class="input input--block"
               type="password"
+              autocomplete="current-password"
+              :aria-label="t('login.password')"
               :placeholder="t('login.password')"
               v-model="password"
-              @keyup.enter="fetchData"
             />
           </div>
           <div class="card-action">
-            <button
-              class="button button--flat"
-              @click="fetchData"
-              :aria-label="t('buttons.submit')"
-              :data-title="t('buttons.submit')"
-            >
+            <button type="submit" class="button button--flat">
               {{ t("buttons.submit") }}
             </button>
           </div>
-        </div>
+        </form>
         <div class="overlay" />
-      </div>
+      </template>
       <errors v-else :errorCode="error.status" />
     </div>
-    <div v-else-if="req !== null">
-      <div class="share">
-        <div
-          class="share__box share__box__info"
-          style="
-            position: -webkit-sticky;
-            position: sticky;
-            top: -20.6em;
-            z-index: 999;
-          "
-        >
-          <div class="share__box__header" style="height: 3em">
+    <div v-else-if="req" class="share-workspace">
+      <section
+        v-if="req.isDir"
+        id="shareList"
+        class="share-content"
+        :aria-label="t('files.files')"
+      >
+        <div class="share-section-heading">
+          <FinderIcon name="folder" />
+          <h1>{{ req.name }}</h1>
+        </div>
+        <div v-if="req.items.length" id="listing" class="list file-icons">
+          <item
+            v-for="item in visibleItems"
+            :key="item.url"
+            :index="item.index"
+            :name="item.name"
+            :isDir="item.isDir"
+            :url="item.url"
+            :modified="item.modified"
+            :type="item.type"
+            :size="item.size"
+            readOnly
+          />
+          <div :class="{ active: fileStore.multiple }" id="multiple-selection">
+            <p>{{ t("files.multipleSelectionEnabled") }}</p>
+            <button
+              class="finder-tool"
+              :aria-label="t('buttons.clear')"
+              @click="fileStore.multiple = false"
+            >
+              <FinderIcon name="back" />
+            </button>
+          </div>
+        </div>
+        <h2 v-else class="message">
+          <FinderIcon name="folder" /><span>{{ t("files.lonely") }}</span>
+        </h2>
+      </section>
+      <section
+        v-else
+        class="share-content share-quicklook"
+        :aria-label="t('sidebar.preview')"
+      >
+        <div class="share-preview-stage">
+          <video
+            v-if="req.type === 'video'"
+            :key="previewLink"
+            :src="previewLink"
+            controls
+            playsinline
+            preload="metadata"
+            :aria-label="req.name"
+          >
+            <a :href="link">{{ t("buttons.download") }}</a>
+          </video>
+          <img
+            v-else-if="req.type === 'image'"
+            :src="previewLink"
+            :alt="req.name"
+          />
+          <template v-else>
+            <FinderFileIcon :isDir="false" :name="req.name" :type="req.type" />
+            <audio
+              v-if="req.type === 'audio'"
+              :src="previewLink"
+              controls
+              preload="metadata"
+              :aria-label="req.name"
+            />
+          </template>
+        </div>
+        <div class="share-preview-caption">
+          <h1>{{ req.name }}</h1>
+          <p>
+            {{ humanSize }} <span aria-hidden="true">·</span> {{ humanTime }}
+          </p>
+        </div>
+      </section>
+
+      <aside class="share-inspector" :aria-label="t('prompts.fileInfo')">
+        <div class="share-file-summary">
+          <FinderFileIcon
+            :isDir="req.isDir"
+            :name="req.name"
+            :type="req.type"
+          />
+          <h2>{{ req.name }}</h2>
+          <p>
             {{
               req.isDir
                 ? t("download.downloadFolder")
                 : t("download.downloadFile")
             }}
-          </div>
-          <div
+          </p>
+        </div>
+        <div class="share-download-actions">
+          <a :href="link" class="share-download"
+            ><FinderIcon name="download" />{{ t("buttons.download") }}</a
+          >
+          <a
             v-if="!req.isDir"
-            class="share__box__element share__box__center share__box__icon"
-          >
-            <i class="material-icons">{{ icon }}</i>
-          </div>
-          <div class="share__box__element" style="height: 3em">
-            <strong>{{ $t("prompts.displayName") }}</strong> {{ req.name }}
-          </div>
-          <div v-if="!req.isDir" class="share__box__element" :title="modTime">
-            <strong>{{ $t("prompts.lastModified") }}:</strong> {{ humanTime }}
-          </div>
-          <div class="share__box__element" style="height: 3em">
-            <strong>{{ $t("prompts.size") }}:</strong> {{ humanSize }}
-          </div>
-          <div class="share__box__element share__box__center">
-            <a
-              target="_blank"
-              :href="link"
-              class="button button--flat"
-              style="height: 4em"
-            >
-              <div>
-                <i class="material-icons">file_download</i
-                >{{ t("buttons.download") }}
-              </div>
-            </a>
-            <a
-              target="_blank"
-              :href="inlineLink"
-              class="button button--flat"
-              v-if="!req.isDir"
-            >
-              <div>
-                <i class="material-icons">open_in_new</i
-                >{{ t("buttons.openFile") }}
-              </div>
-            </a>
-            <qrcode-vue
-              v-if="req.isDir"
-              :value="link"
-              :size="100"
-              level="M"
-            ></qrcode-vue>
-          </div>
-          <div v-if="!req.isDir" class="share__box__element share__box__center">
-            <qrcode-vue :value="link" :size="200" level="M"></qrcode-vue>
-          </div>
-          <div
-            v-if="req.isDir"
-            class="share__box__element share__box__header"
-            style="height: 3em"
-          >
-            {{ $t("sidebar.preview") }}
-          </div>
-          <div
-            v-if="req.isDir"
-            class="share__box__element share__box__center share__box__icon"
-            style="padding: 0em !important; height: 12em !important"
-          >
-            <a
-              target="_blank"
-              :href="raw"
-              class="button button--flat"
-              v-if="
-                !fileStore.multiple &&
-                fileStore.selectedCount === 1 &&
-                req.items[fileStore.selected[0]].type === 'image'
-              "
-              style="height: 12em; padding: 0; margin: 0"
-            >
-              <img
-                style="height: 12em"
-                :src="raw"
-                :alt="req.items[fileStore.selected[0]].name"
-              />
-            </a>
-            <div
-              v-else-if="
-                fileStore.multiple &&
-                fileStore.selectedCount === 1 &&
-                req.items[fileStore.selected[0]].type === 'audio'
-              "
-              style="height: 12em; padding-top: 1em; margin: 0"
-            >
-              <button
-                @click="play"
-                v-if="!tag"
-                style="
-                  font-size: 6em !important;
-                  border: 0px;
-                  outline: none;
-                  background: white;
-                "
-                class="material-icons"
-              >
-                play_circle_filled
-              </button>
-              <button
-                @click="play"
-                v-if="tag"
-                style="
-                  font-size: 6em !important;
-                  border: 0px;
-                  outline: none;
-                  background: white;
-                "
-                class="material-icons"
-              >
-                pause_circle_filled
-              </button>
-              <audio
-                id="myaudio"
-                ref="audio"
-                :src="raw"
-                controls
-                :autoplay="tag"
-              ></audio>
-            </div>
-            <video
-              v-else-if="
-                !fileStore.multiple &&
-                fileStore.selectedCount === 1 &&
-                req.items[fileStore.selected[0]].type === 'video'
-              "
-              style="height: 12em; padding: 0; margin: 0"
-              :src="raw"
-              controls
-            >
-              Sorry, your browser doesn't support embedded videos, but don't
-              worry, you can <a :href="raw">download it</a>
-              and watch it with your favorite video player!
-            </video>
-            <i
-              v-else-if="
-                !fileStore.multiple &&
-                fileStore.selectedCount === 1 &&
-                req.items[fileStore.selected[0]].isDir
-              "
-              class="material-icons"
-              >folder
-            </i>
-            <i v-else class="material-icons">call_to_action</i>
-          </div>
+            :href="inlineLink"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="share-open"
+            >{{ t("buttons.openFile") }}<FinderIcon name="forward"
+          /></a>
         </div>
-        <div
-          id="shareList"
-          v-if="req.isDir && req.items.length > 0"
-          class="share__box share__box__items"
-        >
-          <div class="share__box__header" v-if="req.isDir">
-            {{ t("files.files") }}
+        <dl class="share-metadata">
+          <div>
+            <dt>{{ t("prompts.size") }}</dt>
+            <dd>
+              {{
+                req.isDir
+                  ? t("finder.items", { count: req.items.length })
+                  : humanSize
+              }}
+            </dd>
           </div>
-          <div id="listing" class="list file-icons">
-            <item
-              v-for="item in visibleItems"
-              :key="base64(item.name)"
-              v-bind:index="item.index"
-              v-bind:name="item.name"
-              v-bind:isDir="item.isDir"
-              v-bind:url="item.url"
-              v-bind:modified="item.modified"
-              v-bind:type="item.type"
-              v-bind:size="item.size"
-              readOnly
-            >
-            </item>
-            <div
-              :class="{ active: fileStore.multiple }"
-              id="multiple-selection"
-            >
-              <p>{{ t("files.multipleSelectionEnabled") }}</p>
-              <div
-                @click="() => (fileStore.multiple = false)"
-                tabindex="0"
-                role="button"
-                :data-title="t('buttons.clear')"
-                :aria-label="t('buttons.clear')"
-                class="action"
-              >
-                <i class="material-icons">clear</i>
-              </div>
-            </div>
+          <div :title="modTime">
+            <dt>{{ t("prompts.lastModified") }}</dt>
+            <dd>{{ humanTime }}</dd>
           </div>
+        </dl>
+        <div v-if="selectedItem" class="share-selection-preview">
+          <h3>{{ t("sidebar.preview") }}</h3>
+          <img
+            v-if="selectedItem.type === 'image'"
+            :src="previewLink"
+            :alt="selectedItem.name"
+          />
+          <video
+            v-else-if="selectedItem.type === 'video'"
+            :src="previewLink"
+            controls
+            playsinline
+            preload="metadata"
+            :aria-label="selectedItem.name"
+          />
+          <audio
+            v-else-if="selectedItem.type === 'audio'"
+            :src="previewLink"
+            controls
+            preload="metadata"
+            :aria-label="selectedItem.name"
+          />
+          <FinderFileIcon
+            v-else
+            :isDir="selectedItem.isDir"
+            :name="selectedItem.name"
+            :type="selectedItem.type"
+          />
+          <p>{{ selectedItem.name }}</p>
         </div>
-        <div
-          v-else-if="req.isDir && req.items.length === 0"
-          class="share__box share__box__items"
-        >
-          <h2 class="message">
-            <i class="material-icons">sentiment_dissatisfied</i>
-            <span>{{ t("files.lonely") }}</span>
-          </h2>
+        <div class="share-qr">
+          <qrcode-vue
+            :value="link"
+            :size="112"
+            level="M"
+            render-as="svg"
+            :aria-label="t('buttons.download')"
+          />
         </div>
-      </div>
+      </aside>
     </div>
     <FinderStatus
-      v-if="req?.isDir"
-      :total="req.items.length"
+      v-if="req && !error && !layoutStore.loading"
+      :total="req.isDir ? req.items.length : 1"
       :selected="fileStore.selectedCount"
     />
   </div>
@@ -299,8 +254,8 @@
 import { pub as api } from "@/api";
 import { filesize } from "@/utils";
 import dayjs from "dayjs";
-import { Base64 } from "js-base64";
-import { createURL } from "@/api/utils";
+import FinderIcon from "@/components/FinderIcon.vue";
+import FinderFileIcon from "@/components/files/FinderFileIcon.vue";
 import FinderStatus from "@/components/files/FinderStatus.vue";
 import { listPage, pageSize } from "@/utils/finder";
 import HeaderBar from "@/components/header/HeaderBar.vue";
@@ -322,8 +277,6 @@ const password = ref<string>("");
 const attemptedPasswordLogin = ref<boolean>(false);
 const hash = ref<string>("");
 const token = ref<string>("");
-const audio = ref<HTMLAudioElement>();
-const tag = ref<boolean>(false);
 
 const $showError = inject<IToastError>("$showError")!;
 const $showSuccess = inject<IToastSuccess>("$showSuccess")!;
@@ -350,21 +303,21 @@ const visibleItems = computed(() => {
 
 // Define computes
 
-const icon = computed(() => {
-  if (req.value === null) return "insert_drive_file";
-  if (req.value.isDir) return "folder";
-  if (req.value.type === "image") return "insert_photo";
-  if (req.value.type === "audio") return "volume_up";
-  if (req.value.type === "video") return "movie";
-  return "insert_drive_file";
-});
-
+const selectedItem = computed(() =>
+  req.value?.isDir && fileStore.selectedCount === 1
+    ? req.value.items[fileStore.selected[0]]
+    : null
+);
+const preview = computed(() => selectedItem.value || req.value);
 const link = computed(() => (req.value ? api.getDownloadURL(req.value) : ""));
-const raw = computed(() => {
-  if (!req.value || !req.value.items[fileStore.selected[0]]) return "";
-  return createURL(
-    `api/public/dl/${hash.value}${req.value.items[fileStore.selected[0]].path}`,
-    { token: token.value }
+const previewLink = computed(() => {
+  if (!req.value) return "";
+  return api.getDownloadURL(
+    {
+      ...req.value,
+      path: preview.value?.path || req.value.path,
+    },
+    true
   );
 });
 const inlineLink = computed(() =>
@@ -387,16 +340,6 @@ const modTime = computed(() =>
 );
 
 // Functions
-const base64 = (name: any) => Base64.encodeURI(name);
-const play = () => {
-  if (tag.value) {
-    audio.value?.pause();
-    tag.value = false;
-  } else {
-    audio.value?.play();
-    tag.value = true;
-  }
-};
 const fetchData = async () => {
   fileStore.reload = false;
   fileStore.selected = [];
@@ -446,8 +389,7 @@ const toggleMultipleSelection = () => {
 };
 
 const isSingleFile = () =>
-  fileStore.selectedCount === 1 &&
-  !req.value?.items[fileStore.selected[0]].isDir;
+  Boolean(selectedItem.value && !selectedItem.value.isDir);
 
 const download = () => {
   if (!req.value) return false;
@@ -526,20 +468,3 @@ onBeforeUnmount(() => {
   window.removeEventListener("keydown", keyEvent);
 });
 </script>
-
-<style scoped>
-#listing.list {
-  height: auto;
-}
-
-#shareList {
-  overflow-y: scroll;
-}
-
-@media (min-width: 930px) {
-  #shareList {
-    height: calc(100vh - 9.8em);
-    overflow-y: auto;
-  }
-}
-</style>
