@@ -331,10 +331,10 @@ main .spinner .bounce2 {
 #editor-container {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   background-color: var(--background);
   position: fixed;
-  padding-top: 4em;
+  padding-top: 0;
   top: 0;
   left: 0;
   height: 100%;
@@ -343,12 +343,23 @@ main .spinner .bounce2 {
   overflow: hidden;
 }
 
+#editor-container .finder-toolbar {
+  position: static;
+  flex-shrink: 0;
+}
+
+#editor-container .finder-toolbar title {
+  min-width: 0;
+  white-space: nowrap;
+}
+
 #editor-container .bar {
   background: var(--surfacePrimary);
 }
 
 #editor-container #editor {
   flex: 1;
+  min-height: 0;
 }
 
 #editor-container .breadcrumbs {

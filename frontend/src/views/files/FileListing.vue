@@ -1087,7 +1087,7 @@ const showContextMenu = (event: MouseEvent) => {
   isContextMenuVisible.value = true;
   contextMenuPos.value = {
     x: event.clientX + 8,
-    y: event.clientY + Math.floor(window.scrollY),
+    y: event.clientY,
   };
 };
 

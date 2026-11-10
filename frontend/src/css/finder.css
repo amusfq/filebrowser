@@ -1230,14 +1230,10 @@ html[dir="rtl"] .finder-shell .dashboard #nav .wrapper {
   border-radius: 2px;
 }
 
-#editor-container {
-  padding-top: 60px;
-}
 #previewer .pdf {
   padding-top: 60px;
 }
 @media (max-width: 736px) {
-  #editor-container,
   #previewer .pdf {
     padding-top: 56px;
   }

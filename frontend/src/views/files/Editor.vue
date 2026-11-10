@@ -348,10 +348,28 @@ const preview = () => {
   color: var(--fg);
 }
 
+@media (max-width: 480px) {
+  .editor-font-size {
+    display: none;
+  }
+}
+
 .editor-header {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
+}
+
+.editor-header > .breadcrumbs {
+  min-width: 0;
+  overflow: auto;
+  white-space: nowrap;
+}
+
+.editor-header > div:last-child {
+  display: flex;
+  flex-shrink: 0;
 }
 
 .editor-header > div > button {
