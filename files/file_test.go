@@ -1,6 +1,7 @@
 package files
 
 import (
+	"mime"
 	"os"
 	"path"
 	"path/filepath"
@@ -347,6 +348,15 @@ func TestFileInfoRealPathUsesScopedFsRealPath(t *testing.T) {
 }
 
 func TestTypeScriptAndTransportStream(t *testing.T) {
+	previous := mime.TypeByExtension(".ts")
+	if err := mime.AddExtensionType(".ts", "text/vnd.trolltech.linguist"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := mime.AddExtensionType(".ts", previous); err != nil {
+			t.Error(err)
+		}
+	})
 	for _, test := range []struct {
 		name    string
 		content []byte

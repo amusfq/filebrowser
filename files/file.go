@@ -239,8 +239,12 @@ func (i *FileInfo) detectType(modify, saveContent, readHeader bool, calcImgRes b
 			mimetype = http.DetectContentType(buffer)
 		}
 		// .ts is also MPEG transport stream; use text headers to recognize TypeScript.
-		if strings.EqualFold(i.Extension, ".ts") && strings.HasPrefix(http.DetectContentType(buffer), "text/") {
-			mimetype = "text/plain"
+		if strings.EqualFold(i.Extension, ".ts") {
+			if strings.HasPrefix(http.DetectContentType(buffer), "text/") {
+				mimetype = "text/plain"
+			} else {
+				mimetype = "video/mp2t"
+			}
 		}
 	}
 
