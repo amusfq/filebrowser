@@ -104,7 +104,7 @@ const submit = async (event: Event) => {
     }
 
     await auth.login(username.value, password.value, captcha);
-    router.push({ path: redirect });
+    router.push(redirect);
   } catch (e: any) {
     // console.error(e);
     if (e instanceof StatusError) {

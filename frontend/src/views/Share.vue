@@ -181,6 +181,26 @@
           </p>
         </div>
         <div class="share-download-actions">
+          <router-link
+            v-if="editPath"
+            class="share-open"
+            :to="{
+              path: editPath,
+              query: { ...route.query, page: undefined, edit: 'true' },
+            }"
+          >
+            <i class="material-icons" aria-hidden="true">edit_note</i
+            >{{ t("buttons.editFile") }}
+          </router-link>
+          <router-link
+            v-else-if="
+              !authStore.isLoggedIn && !hideLoginButton && req.type === 'text'
+            "
+            class="share-open"
+            :to="{ path: '/login', query: { redirect: route.fullPath } }"
+          >
+            {{ t("buttons.signInToEdit") }}
+          </router-link>
           <a :href="link" class="share-download"
             ><FinderIcon name="download" />{{ t("buttons.download") }}</a
           >
@@ -259,7 +279,10 @@
 </template>
 
 <script setup lang="ts">
-import { pub as api } from "@/api";
+import { pub as api, share as sharesApi } from "@/api";
+import { useAuthStore } from "@/stores/auth";
+import { sharedEditPath } from "@/utils/editor";
+import { hideLoginButton } from "@/utils/constants";
 import { filesize } from "@/utils";
 import dayjs from "dayjs";
 import FinderIcon from "@/components/FinderIcon.vue";
@@ -307,6 +330,8 @@ const { t } = useI18n({});
 
 const route = useRoute();
 const fileStore = useFileStore();
+const authStore = useAuthStore();
+const editPath = ref("");
 const layoutStore = useLayoutStore();
 
 watch(
@@ -367,6 +392,7 @@ const fetchData = async () => {
   controller = new AbortController();
   const signal = controller.signal;
   textContent.value = "";
+  editPath.value = "";
   fileStore.reload = false;
   fileStore.selected = [];
   fileStore.multiple = false;
@@ -400,6 +426,28 @@ const fetchData = async () => {
     token.value = file.token || "";
 
     fileStore.updateRequest(file);
+    if (
+      !file.isDir &&
+      file.type === "text" &&
+      authStore.user?.perm.modify &&
+      authStore.user.perm.share &&
+      authStore.user.perm.download
+    ) {
+      try {
+        const shares = await sharesApi.list();
+        if (!signal.aborted)
+          editPath.value = sharedEditPath(
+            shares,
+            hash.value,
+            authStore.user.id,
+            file.path
+          );
+      } catch (cause) {
+        if (!signal.aborted)
+          $showError(cause instanceof Error ? cause : String(cause));
+      }
+    }
+    if (signal.aborted) return;
     document.title = `${file.name} - ${document.title}`;
   } catch (err) {
     if (signal.aborted) return;

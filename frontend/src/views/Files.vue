@@ -65,9 +65,10 @@ const { t } = useI18n({});
 let fetchDataController = new AbortController();
 
 const error = ref<StatusError | null>(null);
+const fetchedPath = ref("");
 
 const currentView = computed(() => {
-  if (fileStore.req?.type === undefined) {
+  if (fetchedPath.value !== route.path || fileStore.req?.type === undefined) {
     return null;
   }
 
@@ -167,6 +168,7 @@ const fetchData = async () => {
   try {
     const res = await api.fetch(url, fetchDataController.signal);
     fileStore.updateRequest(res);
+    fetchedPath.value = route.path;
     document.title = `${res.name || t("sidebar.myFiles")} - ${t("files.files")} - ${name}`;
     layoutStore.loading = false;
 

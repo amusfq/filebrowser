@@ -77,3 +77,23 @@ export function editorLanguage(filename: string) {
     )?.[0] || "plaintext"
   );
 }
+
+export function sharedEditPath(
+  shares: Share[],
+  hash: string,
+  userID: number,
+  relativePath: string
+) {
+  const share = shares.find(
+    (entry) => entry.hash === hash && entry.userID === userID
+  );
+  if (!share) return "";
+  return (
+    "/files/" +
+    (share.path.replace(/\/$/, "") + relativePath)
+      .replace(/^\/+/, "")
+      .split("/")
+      .map(encodeURIComponent)
+      .join("/")
+  );
+}

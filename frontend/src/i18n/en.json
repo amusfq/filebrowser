@@ -1,5 +1,7 @@
 {
   "buttons": {
+    "editFile": "Edit file",
+    "signInToEdit": "Sign in to edit",
     "cut": "Cut",
     "paste": "Paste",
     "cancel": "Cancel",

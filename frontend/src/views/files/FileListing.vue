@@ -59,6 +59,12 @@
       />
 
       <template #actions>
+        <action
+          v-if="headerButtons.edit"
+          icon="edit_note"
+          :label="t('buttons.editFile')"
+          @action="editSelected"
+        />
         <template v-if="!isMobile">
           <action
             v-if="headerButtons.share"
@@ -349,6 +355,12 @@
           @hide="hideContextMenu"
         >
           <action
+            v-if="headerButtons.edit"
+            icon="edit_note"
+            :label="t('buttons.editFile')"
+            @action="editSelected"
+          />
+          <action
             v-if="headerButtons.share"
             icon="share"
             :label="t('buttons.share')"
@@ -572,6 +584,10 @@ const viewIcon = computed(() => {
 
 const headerButtons = computed(() => {
   return {
+    edit:
+      fileStore.selectedCount === 1 &&
+      authStore.user?.perm.modify &&
+      fileStore.req?.items[fileStore.selected[0]]?.type === "text",
     upload: authStore.user?.perm.create,
     download: authStore.user?.perm.download,
     shell: authStore.user?.perm.execute && enableExec,
@@ -585,6 +601,15 @@ const headerButtons = computed(() => {
     copy: fileStore.selectedCount > 0 && authStore.user?.perm.create,
   };
 });
+
+const editSelected = () => {
+  const item = fileStore.req?.items[fileStore.selected[0]];
+  if (!headerButtons.value.edit || !item) return;
+  router.push({
+    path: item.url,
+    query: listQuery(route.query, { edit: "true" }),
+  });
+};
 
 const isMobile = computed(() => {
   return width.value <= 736;

@@ -16,14 +16,17 @@
         :label="t('buttons.decreaseFontSize')"
       />
 
-      <action
+      <button
         v-if="!readOnly"
         :disabled="!editor || saving"
         id="save-button"
-        icon="save"
-        :label="t('buttons.save')"
-        @action="save()"
-      />
+        class="editor-save"
+        :aria-label="t('buttons.save')"
+        @click="save()"
+      >
+        <i class="material-icons" aria-hidden="true">save</i>
+        <span>{{ t("buttons.save") }}</span>
+      </button>
 
       <action
         icon="preview"
@@ -319,6 +322,27 @@ const preview = () => {
 </script>
 
 <style scoped>
+.editor-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 5px;
+  color: white;
+  background: var(--blue);
+  cursor: pointer;
+  font-size: 13px;
+}
+.editor-save:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.editor-save i {
+  font-size: 18px;
+}
+
 .editor-font-size {
   margin: 0 0.5em;
   color: var(--fg);
