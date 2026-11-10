@@ -137,9 +137,12 @@ jobs:
         # Dokploy owns runtime settings and volumes, and pulls :latest after publication.
         env:
           DOKPLOY_WEBHOOK_URL: ${{ secrets.DOKPLOY_WEBHOOK_URL }}
+          DOKPLOY_ORIGIN_IP: ${{ vars.DOKPLOY_ORIGIN_IP }}
         run: |
           test -n "$DOKPLOY_WEBHOOK_URL"
-          curl --fail-with-body --silent --show-error --retry 3 --retry-all-errors --connect-timeout 15 --max-time 120 --request POST "$DOKPLOY_WEBHOOK_URL"
+          test -n "$DOKPLOY_ORIGIN_IP"
+          # Reach the HTTPS origin directly; Cloudflare challenges cannot run in CI.
+          curl --fail --silent --show-error --retry 3 --retry-all-errors --connect-timeout 15 --max-time 120 --connect-to "::${DOKPLOY_ORIGIN_IP}:" --request POST "$DOKPLOY_WEBHOOK_URL"
 
   release:
     name: Release

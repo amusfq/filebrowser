@@ -11,6 +11,9 @@ in the GitHub Actions secret `DOKPLOY_WEBHOOK_URL`. Use the compose deployment
 webhook from Dokploy, rather than a notification webhook. Runtime settings,
 registry credentials, domains, and persistent mounts stay in Dokploy. A private
 GHCR image requires a registry credential with `read:packages` in Dokploy.
+Set the GitHub Actions variable `DOKPLOY_ORIGIN_IP` to the Dokploy server IP.
+The webhook connects directly to that origin while retaining the URL hostname
+and TLS certificate verification, avoiding Cloudflare browser challenges in CI.
 
 For a separate Docker installation, run `docker compose up -d` with `compose.yaml`.
 It persists served files at `/srv`, configuration at `/config`, and the database
