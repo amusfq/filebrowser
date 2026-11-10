@@ -192,7 +192,7 @@
     "video": "Видео"
   },
   "settings": {
-    "aceEditorTheme": "Тема редактора Ace",
+    "aceEditorTheme": "Тема редактора Monaco",
     "admin": "Админ",
     "administrator": "Администратор",
     "allowCommands": "Запуск команд",

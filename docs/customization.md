@@ -2,6 +2,17 @@
 
 You can customize the styles, branding and icons of your File Browser instance in order to give it a personal touch.
 
+## Text viewer and editor
+
+Text files use Monaco Editor with TextMate syntax highlighting through Shiki.
+The editor, worker, grammars, and Oniguruma engine are served locally and loaded
+when opening a text file. Shared text files and files without modify permission
+open read-only. Markdown keeps its rendered preview.
+
+Choose an editor theme in **Settings → Profile Settings**. The existing
+`aceEditorTheme` API field remains compatible; common saved Ace themes map to
+their Monaco equivalents. Unsupported file extensions open as plain text.
+
 ## Custom Branding
 
 You can customize File Browser to use your own branding. This includes the following:

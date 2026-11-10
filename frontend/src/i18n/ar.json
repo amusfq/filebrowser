@@ -190,7 +190,7 @@
     "video": "فيديوهات"
   },
   "settings": {
-    "aceEditorTheme": "Ace editor theme",
+    "aceEditorTheme": "Monaco editor theme",
     "admin": "إدارة",
     "administrator": "مدير",
     "allowCommands": "تنفيذ اﻷوامر",

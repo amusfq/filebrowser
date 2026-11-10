@@ -34,11 +34,11 @@
           ></languages>
 
           <h3>{{ t("settings.aceEditorTheme") }}</h3>
-          <AceEditorTheme
+          <EditorTheme
             class="input input--block"
             v-model:aceEditorTheme="aceEditorTheme"
-            id="aceTheme"
-          ></AceEditorTheme>
+            id="editorTheme"
+          ></EditorTheme>
         </div>
 
         <div class="card-action">
@@ -105,7 +105,8 @@
 import { useAuthStore } from "@/stores/auth";
 import { useLayoutStore } from "@/stores/layout";
 import { users as api } from "@/api";
-import AceEditorTheme from "@/components/settings/AceEditorTheme.vue";
+import EditorTheme from "@/components/settings/EditorTheme.vue";
+import { getEditorTheme } from "@/utils/theme";
 import Languages from "@/components/settings/Languages.vue";
 import { computed, inject, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -151,7 +152,9 @@ onMounted(async () => {
   singleClick.value = authStore.user.singleClick;
   redirectAfterCopyMove.value = authStore.user.redirectAfterCopyMove;
   dateFormat.value = authStore.user.dateFormat;
-  aceEditorTheme.value = authStore.user.aceEditorTheme;
+  aceEditorTheme.value = authStore.user.aceEditorTheme
+    ? getEditorTheme(authStore.user.aceEditorTheme)
+    : "";
   layoutStore.loading = false;
   isCurrentPasswordRequired.value = authMethod == "json";
 

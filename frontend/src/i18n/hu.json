@@ -190,7 +190,7 @@
     "video": "Videó"
   },
   "settings": {
-    "aceEditorTheme": "Ace editor theme",
+    "aceEditorTheme": "Monaco editor theme",
     "admin": "Admin",
     "administrator": "Adminisztrátor",
     "allowCommands": "Parancsok futtatása",

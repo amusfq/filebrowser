@@ -1,5 +1,7 @@
 {
   "buttons": {
+    "cut": "Cut",
+    "paste": "Paste",
     "cancel": "Cancel",
     "clear": "Clear",
     "close": "Close",
@@ -192,7 +194,7 @@
     "video": "Video"
   },
   "settings": {
-    "aceEditorTheme": "Ace editor theme",
+    "aceEditorTheme": "Monaco editor theme",
     "admin": "Admin",
     "administrator": "Administrator",
     "allowCommands": "Execute commands",

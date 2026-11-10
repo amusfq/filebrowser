@@ -192,7 +192,7 @@
     "video": "Video"
   },
   "settings": {
-    "aceEditorTheme": "Ace-Editor-Theme",
+    "aceEditorTheme": "Monaco-Editor-Theme",
     "admin": "Admin",
     "administrator": "Administrator",
     "allowCommands": "Befehle ausführen",

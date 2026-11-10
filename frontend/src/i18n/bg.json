@@ -190,7 +190,7 @@
     "video": "Видео"
   },
   "settings": {
-    "aceEditorTheme": "Тема на \"Ace редактор\"",
+    "aceEditorTheme": "Тема на \"Monaco редактор\"",
     "admin": "Админ",
     "administrator": "Администратор",
     "allowCommands": "Изпълни команди",

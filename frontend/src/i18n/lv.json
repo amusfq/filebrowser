@@ -192,7 +192,7 @@
     "video": "Video"
   },
   "settings": {
-    "aceEditorTheme": "Ace redaktora tēma",
+    "aceEditorTheme": "Monaco redaktora tēma",
     "admin": "Admin",
     "administrator": "Administrator",
     "allowCommands": "Izpildīt komandas",

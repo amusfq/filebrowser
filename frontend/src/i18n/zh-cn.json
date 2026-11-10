@@ -192,7 +192,7 @@
     "video": "视频"
   },
   "settings": {
-    "aceEditorTheme": "Ace编辑器主题",
+    "aceEditorTheme": "Monaco编辑器主题",
     "admin": "管理员",
     "administrator": "管理员",
     "allowCommands": "允许执行终端命令",

@@ -17,7 +17,8 @@
       />
 
       <action
-        v-if="authStore.user?.perm.modify"
+        v-if="!readOnly"
+        :disabled="!editor || saving"
         id="save-button"
         icon="save"
         :label="t('buttons.save')"
@@ -47,20 +48,29 @@
         <div>
           <button
             :disabled="isSelectionEmpty"
+            :aria-label="t('buttons.copy')"
             @click="executeEditorCommand('copy')"
           >
             <span><i class="material-icons">content_copy</i></span>
           </button>
           <button
-            :disabled="isSelectionEmpty"
+            :disabled="isSelectionEmpty || readOnly"
+            :aria-label="t('buttons.cut')"
             @click="executeEditorCommand('cut')"
           >
             <span><i class="material-icons">content_cut</i></span>
           </button>
-          <button @click="executeEditorCommand('paste')">
+          <button
+            :disabled="readOnly"
+            :aria-label="t('buttons.paste')"
+            @click="executeEditorCommand('paste')"
+          >
             <span><i class="material-icons">content_paste</i></span>
           </button>
-          <button @click="executeEditorCommand('openCommandPalette')">
+          <button
+            :aria-label="t('buttons.more')"
+            @click="executeEditorCommand('openCommandPalette')"
+          >
             <span><i class="material-icons">more_vert</i></span>
           </button>
         </div>
@@ -72,20 +82,27 @@
         class="md_preview"
         v-html="previewContent"
       ></div>
-      <form v-show="!isPreview || !isMarkdownFile" id="editor"></form>
+      <MonacoEditor
+        v-show="!isPreview || !isMarkdownFile"
+        id="editor"
+        v-model="content"
+        :filename="fileStore.req?.name || ''"
+        :readOnly="readOnly"
+        :fontSize="fontSize"
+        :theme="getEditorTheme(authStore.user?.aceEditorTheme || '')"
+        @ready="editorReady"
+      />
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
+import type { editor as Monaco } from "monaco-editor";
 import { files as api } from "@/api";
 import buttons from "@/utils/buttons";
 import url from "@/utils/url";
-import ace, { Ace, version as ace_version } from "ace-builds";
-import "ace-builds/src-noconflict/ext-language_tools";
-import modelist from "ace-builds/src-noconflict/ext-modelist";
 import DOMPurify from "dompurify";
-
+import MonacoEditor from "@/components/files/MonacoEditor.vue";
 import Breadcrumbs from "@/components/Breadcrumbs.vue";
 import Action from "@/components/header/Action.vue";
 import HeaderBar from "@/components/header/HeaderBar.vue";
@@ -95,232 +112,207 @@ import { useLayoutStore } from "@/stores/layout";
 import { getEditorTheme } from "@/utils/theme";
 import { marked } from "marked";
 import markedKatex from "marked-katex-extension";
-import { inject, onBeforeUnmount, onMounted, ref, watchEffect } from "vue";
+import {
+  computed,
+  inject,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  shallowRef,
+  watch,
+} from "vue";
 import { useI18n } from "vue-i18n";
-import { onBeforeRouteUpdate, useRoute, useRouter } from "vue-router";
+import {
+  onBeforeRouteLeave,
+  onBeforeRouteUpdate,
+  useRoute,
+  useRouter,
+} from "vue-router";
 import { read, copy } from "@/utils/clipboard";
 
 const $showError = inject<IToastError>("$showError")!;
-
 const fileStore = useFileStore();
 const authStore = useAuthStore();
 const layoutStore = useLayoutStore();
-
 const { t } = useI18n();
-
 const route = useRoute();
 const router = useRouter();
-
-const editor = ref<Ace.Editor | null>(null);
-const fontSize = ref(parseInt(localStorage.getItem("editorFontSize") || "14"));
-
+const editor = shallowRef<Monaco.IStandaloneCodeEditor>();
+const content = ref(fileStore.req?.content || "");
+const fontSize = ref(
+  Math.max(
+    8,
+    Math.min(48, Number(localStorage.getItem("editorFontSize")) || 14)
+  )
+);
+const readOnly = computed(
+  () => fileStore.req?.type === "textImmutable" || !authStore.user?.perm.modify
+);
+const saving = ref(false);
+const isDirty = ref(false);
+let savedVersion = 0;
 const isPreview = ref(false);
 const previewContent = ref("");
-const isMarkdownFile =
-  fileStore.req?.name.endsWith(".md") ||
-  fileStore.req?.name.endsWith(".markdown");
-const katexOptions = {
-  output: "mathml" as const,
-  throwOnError: false,
-};
-marked.use(markedKatex(katexOptions));
-
+const isMarkdownFile = computed(() =>
+  /\.(md|markdown)$/i.test(fileStore.req?.name || "")
+);
 const isSelectionEmpty = ref(true);
+marked.use(markedKatex({ output: "mathml", throwOnError: false }));
 
-const executeEditorCommand = (name: string) => {
-  if (name == "paste") {
-    read()
-      .then((data) => {
-        editor.value?.execCommand("paste", {
-          text: data,
-        });
-      })
-      .catch((e) => {
-        if (
-          document.queryCommandSupported &&
-          document.queryCommandSupported("paste")
-        ) {
-          document.execCommand("paste");
-        } else {
-          console.warn("the clipboard api is not supported", e);
-        }
-      });
-    return;
-  }
-  if (name == "copy" || name == "cut") {
-    const selectedText = editor.value?.getCopyText();
-    copy({ text: selectedText });
-  }
-  editor.value?.execCommand(name);
-};
-
-onMounted(() => {
-  window.addEventListener("keydown", keyEvent);
-  window.addEventListener("beforeunload", handlePageChange);
-
-  const fileContent = fileStore.req?.content || "";
-
-  watchEffect(async () => {
-    if (isMarkdownFile && isPreview.value) {
-      const new_value = editor.value?.getValue() || "";
-      try {
-        previewContent.value = DOMPurify.sanitize(await marked(new_value));
-      } catch (error) {
-        console.error("Failed to convert content to HTML:", error);
-        previewContent.value = "";
-      }
+watch([content, isPreview], async ([value, preview], _, onCleanup) => {
+  let cancelled = false;
+  onCleanup(() => {
+    cancelled = true;
+  });
+  if (isMarkdownFile.value && preview) {
+    try {
+      const html = DOMPurify.sanitize(await marked(value));
+      if (!cancelled) previewContent.value = html;
+    } catch (error) {
+      $showError(error instanceof Error ? error : String(error));
     }
-  });
-
-  ace.config.set(
-    "basePath",
-    `https://cdn.jsdelivr.net/npm/ace-builds@${ace_version}/src-min-noconflict/`
-  );
-
-  if (!layoutStore.loading) {
-    initEditor(fileContent);
-  } else {
-    const unwatch = watchEffect(() => {
-      // Initialize editor when layout is loaded
-      if (!layoutStore.loading) {
-        setTimeout(() => {
-          initEditor(fileContent);
-          unwatch();
-        }, 50);
-      }
-    });
   }
 });
 
-onBeforeUnmount(() => {
-  window.removeEventListener("keydown", keyEvent);
-  window.removeEventListener("beforeunload", handlePageChange);
-  editor.value?.destroy();
-});
-
-onBeforeRouteUpdate((to, from, next) => {
-  if (editor.value?.session.getUndoManager().isClean()) {
-    next();
-
-    return;
-  }
-
-  layoutStore.showHover({
-    prompt: "discardEditorChanges",
-    confirm: (event: Event) => {
-      event.preventDefault();
-      next();
-    },
-    saveAction: async () => {
-      await save();
-      next();
-    },
+const editorReady = (instance: Monaco.IStandaloneCodeEditor) => {
+  editor.value = instance;
+  savedVersion = instance.getModel()!.getAlternativeVersionId();
+  instance.onDidChangeModelContent(() => {
+    isDirty.value =
+      instance.getModel()!.getAlternativeVersionId() !== savedVersion;
   });
-});
-
-const initEditor = (fileContent: string) => {
-  editor.value = ace.edit("editor", {
-    value: fileContent,
-    showPrintMargin: false,
-    readOnly: fileStore.req?.type === "textImmutable",
-    theme: getEditorTheme(authStore.user?.aceEditorTheme ?? ""),
-    mode: modelist.getModeForPath(fileStore.req!.name).mode,
-    wrap: true,
-    enableBasicAutocompletion: true,
-    enableLiveAutocompletion: true,
-    enableSnippets: true,
+  instance.onDidChangeCursorSelection(() => {
+    isSelectionEmpty.value = instance.getSelection()?.isEmpty() ?? true;
   });
-
-  editor.value.setFontSize(fontSize.value);
-  editor.value.focus();
-
-  const selection = editor.value?.getSelection();
-  selection.on("changeSelection", function () {
-    isSelectionEmpty.value = selection.isEmpty();
-  });
+  instance.focus();
 };
 
-const keyEvent = (event: KeyboardEvent) => {
-  if (event.code === "Escape") {
-    close();
-  }
-
-  if (!event.ctrlKey && !event.metaKey) {
-    return;
-  }
-
-  if (event.key !== "s") {
-    return;
-  }
-
-  event.preventDefault();
-  save();
-};
-
-const handlePageChange = (event: BeforeUnloadEvent) => {
-  if (!editor.value?.session.getUndoManager().isClean()) {
-    event.preventDefault();
-    // returnValue is now depecrated, though keeping in for legacy browser support
-    // https://developer.mozilla.org/en-US/docs/Web/API/BeforeUnloadEvent/returnValue
-    event.returnValue = true;
-  }
-};
-
-const save = async (throwError?: boolean) => {
-  const button = "save";
-  buttons.loading("save");
-
+const executeEditorCommand = async (name: string) => {
+  const instance = editor.value;
+  if (!instance) return;
   try {
-    await api.put(route.path, editor.value?.getValue());
-    editor.value?.session.getUndoManager().markClean();
-    buttons.success(button);
-  } catch (e: any) {
-    buttons.done(button);
-    $showError(e);
-    if (throwError) throw e;
+    if (name === "paste") {
+      if (readOnly.value) return;
+      const text = await read();
+      if (editor.value === instance) {
+        instance.executeEdits("clipboard", [
+          { range: instance.getSelection()!, text, forceMoveMarkers: true },
+        ]);
+      }
+    } else if (name === "copy" || name === "cut") {
+      const selection = instance.getSelection()!;
+      const model = instance.getModel()!;
+      const version = model.getVersionId();
+      await copy({ text: model.getValueInRange(selection) });
+      if (
+        name === "cut" &&
+        !readOnly.value &&
+        model.getVersionId() === version
+      ) {
+        instance.executeEdits("clipboard", [
+          { range: selection, text: "", forceMoveMarkers: true },
+        ]);
+      }
+    } else {
+      instance.focus();
+      await instance.getAction("editor.action.quickCommand")?.run();
+      return;
+    }
+    instance.focus();
+  } catch (error) {
+    $showError(error instanceof Error ? error : String(error));
   }
 };
 
-const increaseFontSize = () => {
-  fontSize.value += 1;
-  editor.value?.setFontSize(fontSize.value);
-  localStorage.setItem("editorFontSize", fontSize.value.toString());
-};
-
-const decreaseFontSize = () => {
-  if (fontSize.value > 1) {
-    fontSize.value -= 1;
-    editor.value?.setFontSize(fontSize.value);
-    localStorage.setItem("editorFontSize", fontSize.value.toString());
+const save = async () => {
+  const model = editor.value?.getModel();
+  if (!model || readOnly.value || saving.value) return false;
+  const version = model.getAlternativeVersionId();
+  const text = model.getValue();
+  saving.value = true;
+  buttons.loading("save");
+  try {
+    await api.put(route.path, text);
+    if (editor.value?.getModel() === model) {
+      savedVersion = version;
+      isDirty.value = model.getAlternativeVersionId() !== savedVersion;
+      buttons.success("save");
+    }
+    return true;
+  } catch (error) {
+    buttons.done("save");
+    $showError(error instanceof Error ? error : String(error));
+    return false;
+  } finally {
+    saving.value = false;
   }
 };
 
-const close = () => {
-  if (!editor.value?.session.getUndoManager().isClean()) {
+const confirmNavigation = () => {
+  if (!isDirty.value) return true;
+  return new Promise<boolean>((resolve) => {
+    const leave = () => {
+      resolve(true);
+      layoutStore.closeHovers();
+    };
     layoutStore.showHover({
       prompt: "discardEditorChanges",
       confirm: (event: Event) => {
         event.preventDefault();
-        editor.value?.session.getUndoManager().reset();
-        finishClose();
+        leave();
       },
       saveAction: async () => {
-        try {
-          await save(true);
-          finishClose();
-        } catch {}
+        if ((await save()) && !isDirty.value) leave();
+      },
+      close: async () => {
+        resolve(false);
+        return "";
       },
     });
-    return;
+  });
+};
+onBeforeRouteLeave(confirmNavigation);
+onBeforeRouteUpdate((to, from) => {
+  if (to.path !== from.path || to.query.edit !== from.query.edit)
+    return confirmNavigation();
+  return true;
+});
+
+const keyEvent = (event: KeyboardEvent) => {
+  if (event.defaultPrevented || layoutStore.currentPromptName) return;
+  if (event.code === "Escape") close();
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+    event.preventDefault();
+    save();
   }
-  finishClose();
 };
-
-const finishClose = () => {
-  const uri = url.removeLastDir(route.path) + "/";
-  router.push({ path: uri });
+const handlePageChange = (event: BeforeUnloadEvent) => {
+  if (isDirty.value) {
+    event.preventDefault();
+    event.returnValue = true;
+  }
 };
-
+onMounted(() => {
+  window.addEventListener("keydown", keyEvent);
+  window.addEventListener("beforeunload", handlePageChange);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", keyEvent);
+  window.removeEventListener("beforeunload", handlePageChange);
+  editor.value = undefined;
+});
+watch(fontSize, (size) => localStorage.setItem("editorFontSize", String(size)));
+const increaseFontSize = () => {
+  fontSize.value = Math.min(48, fontSize.value + 1);
+};
+const decreaseFontSize = () => {
+  fontSize.value = Math.max(8, fontSize.value - 1);
+};
+const close = () =>
+  router.push({
+    path: url.removeLastDir(route.path) + "/",
+    query: { ...route.query, edit: undefined },
+  });
 const preview = () => {
   isPreview.value = !isPreview.value;
 };

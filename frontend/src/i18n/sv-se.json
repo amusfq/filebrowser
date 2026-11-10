@@ -190,7 +190,7 @@
     "video": "Video"
   },
   "settings": {
-    "aceEditorTheme": "Tema för Ace editor",
+    "aceEditorTheme": "Tema för Monaco editor",
     "admin": "Admin",
     "administrator": "Administratör",
     "allowCommands": "Exekvera kommandon",

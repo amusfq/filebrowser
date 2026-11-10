@@ -1,18 +1,18 @@
 <template>
-  <select
-    name="selectAceEditorTheme"
-    v-on:change="change"
-    :value="aceEditorTheme"
-  >
-    <option v-for="theme in themes" :value="theme.theme" :key="theme.theme">
-      {{ theme.name }}
+  <select name="editorTheme" v-on:change="change" :value="aceEditorTheme">
+    <option
+      v-for="theme in editorThemes"
+      :value="theme.value"
+      :key="theme.value"
+    >
+      {{ theme.label }}
     </option>
   </select>
 </template>
 
 <script setup lang="ts">
 import { type SelectHTMLAttributes } from "vue";
-import { themes } from "ace-builds/src-noconflict/ext-themelist";
+import { editorThemes } from "@/utils/editor";
 
 defineProps<{
   aceEditorTheme: string;

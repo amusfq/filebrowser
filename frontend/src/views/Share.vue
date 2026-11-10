@@ -137,6 +137,14 @@
             :src="previewLink"
             :alt="req.name"
           />
+          <MonacoEditor
+            v-else-if="req.type === 'text' || req.type === 'textImmutable'"
+            class="share-text-preview"
+            :modelValue="textContent"
+            :filename="req.name"
+            :theme="getEditorTheme('')"
+            readOnly
+          />
           <template v-else>
             <FinderFileIcon :isDir="false" :name="req.name" :type="req.type" />
             <audio
@@ -266,12 +274,26 @@ import QrcodeVue from "qrcode.vue";
 import Item from "@/components/files/ListingItem.vue";
 import { useFileStore } from "@/stores/file";
 import { useLayoutStore } from "@/stores/layout";
-import { computed, inject, onMounted, onBeforeUnmount, ref, watch } from "vue";
+import {
+  computed,
+  defineAsyncComponent,
+  inject,
+  onMounted,
+  onBeforeUnmount,
+  ref,
+  watch,
+} from "vue";
+import { getEditorTheme } from "@/utils/theme";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { StatusError } from "@/api/utils";
 import { copy } from "@/utils/clipboard";
 
+const MonacoEditor = defineAsyncComponent(
+  () => import("@/components/files/MonacoEditor.vue")
+);
+const textContent = ref("");
+let controller = new AbortController();
 const error = ref<StatusError | null>(null);
 const password = ref<string>("");
 const attemptedPasswordLogin = ref<boolean>(false);
@@ -341,6 +363,10 @@ const modTime = computed(() =>
 
 // Functions
 const fetchData = async () => {
+  controller.abort();
+  controller = new AbortController();
+  const signal = controller.signal;
+  textContent.value = "";
   fileStore.reload = false;
   fileStore.selected = [];
   fileStore.multiple = false;
@@ -358,19 +384,30 @@ const fetchData = async () => {
   if (url[0] !== "/") url = "/" + url;
 
   try {
-    const file = await api.fetch(url, password.value);
+    const file = await api.fetch(url, password.value, signal);
     file.hash = hash.value;
+    if (
+      !file.isDir &&
+      (file.type === "text" || file.type === "textImmutable")
+    ) {
+      const response = await fetch(api.getDownloadURL(file, true), { signal });
+      if (!response.ok)
+        throw new StatusError(response.statusText, response.status);
+      textContent.value = await response.text();
+    }
+    if (signal.aborted) return;
 
     token.value = file.token || "";
 
     fileStore.updateRequest(file);
     document.title = `${file.name} - ${document.title}`;
   } catch (err) {
+    if (signal.aborted) return;
     if (err instanceof Error) {
       error.value = err;
     }
   } finally {
-    layoutStore.loading = false;
+    if (!signal.aborted) layoutStore.loading = false;
   }
 };
 
@@ -464,6 +501,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  controller.abort();
   // Destroyed
   window.removeEventListener("keydown", keyEvent);
 });

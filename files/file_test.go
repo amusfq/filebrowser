@@ -345,3 +345,31 @@ func TestFileInfoRealPathUsesScopedFsRealPath(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
+
+func TestTypeScriptAndTransportStream(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		content []byte
+		want    string
+	}{
+		{"TypeScript", []byte("const answer: number = 42;\n"), "text"},
+		{"transport stream", []byte{0x47, 0x40, 0x00, 0x10, 0x00, 0x00, 0x01}, "video"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			fs := afero.NewMemMapFs()
+			if err := afero.WriteFile(fs, "/sample.ts", test.content, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			file, err := NewFileInfo(&FileOptions{Fs: fs, Path: "/sample.ts", Modify: true, ReadHeader: true, Content: true, Expand: true, Checker: allowAllChecker{}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if file.Type != test.want {
+				t.Fatalf("type = %q, want %q", file.Type, test.want)
+			}
+			if test.want == "text" && file.Content != string(test.content) {
+				t.Fatal("TypeScript content was not loaded for editing")
+			}
+		})
+	}
+}

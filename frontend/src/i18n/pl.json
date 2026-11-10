@@ -192,7 +192,7 @@
     "video": "Wideo"
   },
   "settings": {
-    "aceEditorTheme": "Motyw edytora Ace",
+    "aceEditorTheme": "Motyw edytora Monaco",
     "admin": "Admin",
     "administrator": "Administrator",
     "allowCommands": "Wykonaj polecenie",

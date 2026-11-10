@@ -190,7 +190,7 @@
     "video": "Myndbönd"
   },
   "settings": {
-    "aceEditorTheme": "Ace editor theme",
+    "aceEditorTheme": "Monaco editor theme",
     "admin": "Stjórnandi",
     "administrator": "Stjórnandi",
     "allowCommands": "Senda skipanir",

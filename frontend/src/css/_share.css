@@ -263,3 +263,12 @@
     padding: 24px;
   }
 }
+
+.share-preview-stage > .share-text-preview {
+  flex: 1;
+  min-height: 360px;
+  width: 100%;
+  border: 1px solid var(--borderPrimary);
+  border-radius: 6px;
+  overflow: hidden;
+}

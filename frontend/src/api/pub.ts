@@ -1,12 +1,17 @@
 import { fetchURL, removePrefix, createURL } from "./utils";
 import { baseURL } from "@/utils/constants";
 
-export async function fetch(url: string, password: string = "") {
+export async function fetch(
+  url: string,
+  password: string = "",
+  signal?: AbortSignal
+) {
   url = removePrefix(url);
 
   const res = await fetchURL(
     `/api/public/share${url}`,
     {
+      signal,
       headers: { "X-SHARE-PASSWORD": encodeURIComponent(password) },
     },
     false

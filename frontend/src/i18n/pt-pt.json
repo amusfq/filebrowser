@@ -192,7 +192,7 @@
     "video": "Vídeo"
   },
   "settings": {
-    "aceEditorTheme": "Editor de temas audaz",
+    "aceEditorTheme": "Tema do editor Monaco",
     "admin": "Admin",
     "administrator": "Administrador",
     "allowCommands": "Executar comandos",

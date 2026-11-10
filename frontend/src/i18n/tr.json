@@ -190,7 +190,7 @@
     "video": "Video"
   },
   "settings": {
-    "aceEditorTheme": "Ace editor theme",
+    "aceEditorTheme": "Monaco editor theme",
     "admin": "Yönetim",
     "administrator": "Yönetici",
     "allowCommands": "Komutları çalıştır",

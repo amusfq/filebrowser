@@ -190,7 +190,7 @@
     "video": "Video"
   },
   "settings": {
-    "aceEditorTheme": "Ace editor theme",
+    "aceEditorTheme": "Monaco editor theme",
     "admin": "Admin",
     "administrator": "Administrátor",
     "allowCommands": "Povolit příkazy",
