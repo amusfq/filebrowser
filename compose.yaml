@@ -2,6 +2,7 @@ services:
   filebrowser:
     container_name: filebrowser
     image: ghcr.io/amusfq/filebrowser:latest
+    pull_policy: always
     networks:
       - filebrowser
     ports:

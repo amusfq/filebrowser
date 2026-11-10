@@ -14,6 +14,8 @@ GHCR image requires a registry credential with `read:packages` in Dokploy.
 Set the GitHub Actions variable `DOKPLOY_ORIGIN_IP` to the Dokploy server IP.
 The webhook connects directly to that origin while retaining the URL hostname
 and TLS certificate verification, avoiding Cloudflare browser challenges in CI.
+Set `pull_policy: always` on the Dokploy compose service so each deployment
+fetches the newly published `latest` image instead of reusing a cached image.
 
 For a separate Docker installation, run `docker compose up -d` with `compose.yaml`.
 It persists served files at `/srv`, configuration at `/config`, and the database
