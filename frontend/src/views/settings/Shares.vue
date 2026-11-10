@@ -19,7 +19,7 @@
               <th></th>
             </tr>
 
-            <tr v-for="link in links" :key="link.hash">
+            <tr v-for="link in visibleItems" :key="link.hash">
               <td>
                 <a :href="buildLink(link)" target="_blank">{{ link.path }}</a>
               </td>
@@ -59,16 +59,20 @@
         </h2>
       </div>
     </div>
+    <FinderStatus :total="links.length" />
   </div>
 </template>
 
 <script setup lang="ts">
+import { useRoute } from "vue-router";
+import FinderStatus from "@/components/files/FinderStatus.vue";
+import { listPage, pageSize } from "@/utils/finder";
 import { useAuthStore } from "@/stores/auth";
 import { useLayoutStore } from "@/stores/layout";
 import { share as api, users } from "@/api";
 import dayjs from "dayjs";
 import Errors from "@/views/Errors.vue";
-import { inject, ref, onMounted } from "vue";
+import { inject, ref, onMounted, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { StatusError } from "@/api/utils";
 import { copy } from "@/utils/clipboard";
@@ -80,8 +84,13 @@ const { t } = useI18n();
 const layoutStore = useLayoutStore();
 const authStore = useAuthStore();
 
+const route = useRoute();
 const error = ref<StatusError | null>(null);
 const links = ref<Share[]>([]);
+const visibleItems = computed(() => {
+  const page = listPage(route.query.page, links.value.length);
+  return links.value.slice((page - 1) * pageSize, page * pageSize);
+});
 
 onMounted(async () => {
   layoutStore.loading = true;
@@ -134,11 +143,11 @@ const deleteLink = async (event: Event, link: any) => {
 
   layoutStore.showHover({
     prompt: "share-delete",
-    confirm: () => {
+    confirm: async () => {
       layoutStore.closeHovers();
 
       try {
-        api.remove(link.hash);
+        await api.remove(link.hash);
         links.value = links.value.filter((item) => item.hash !== link.hash);
         $showSuccess(t("settings.shareDeleted"));
       } catch (err) {

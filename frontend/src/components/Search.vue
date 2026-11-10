@@ -59,7 +59,17 @@
         </template>
         <ul v-show="results.length > 0">
           <li v-for="(s, k) in filteredResults" :key="k">
-            <router-link v-on:click="close" :to="s.url">
+            <router-link
+              :to="{
+                path: s.url,
+                query: {
+                  ...route.query,
+                  q: undefined,
+                  searchPage: undefined,
+                  page: undefined,
+                },
+              }"
+            >
               <i v-if="s.dir" class="material-icons">folder</i>
               <i v-else class="material-icons">insert_drive_file</i>
               <span>./{{ s.path }}</span>
@@ -68,6 +78,11 @@
         </ul>
       </div>
     </div>
+    <FinderStatus
+      v-if="active && results.length"
+      :total="results.length"
+      queryKey="searchPage"
+    />
   </div>
 </template>
 
@@ -77,10 +92,12 @@ import { useLayoutStore } from "@/stores/layout";
 
 import url from "@/utils/url";
 import { search } from "@/api";
-import { computed, inject, onMounted, ref, watch, onUnmounted } from "vue";
+import { computed, inject, nextTick, ref, watch, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
+import FinderStatus from "@/components/files/FinderStatus.vue";
+import { listPage, listQuery, pageSize } from "@/utils/finder";
 import { StatusError } from "@/api/utils";
 
 const boxes = {
@@ -101,7 +118,6 @@ const active = ref<boolean>(false);
 const ongoing = ref<boolean>(false);
 const results = ref<any[]>([]);
 const reload = ref<boolean>(false);
-const resultsCount = ref<number>(50);
 
 const $showError = inject<IToastError>("$showError")!;
 
@@ -111,6 +127,7 @@ const result = ref<HTMLElement | null>(null);
 const { t } = useI18n();
 
 const route = useRoute();
+const router = useRouter();
 
 watch(currentPromptName, (newVal, oldVal) => {
   active.value = newVal === "search";
@@ -125,6 +142,11 @@ watch(currentPromptName, (newVal, oldVal) => {
     prompt.value = "";
     active.value = false;
     input.value?.blur();
+    if (route.query.q)
+      router.replace({
+        path: route.path,
+        query: { ...route.query, q: undefined, searchPage: undefined },
+      });
   } else if (active.value) {
     reload.value = false;
     input.value?.focus();
@@ -134,6 +156,11 @@ watch(currentPromptName, (newVal, oldVal) => {
 
 watch(prompt, () => {
   reset();
+  if (route.query.searchPage && prompt.value && prompt.value !== route.query.q)
+    router.replace({
+      path: route.path,
+      query: { ...route.query, searchPage: undefined },
+    });
 });
 
 // ...mapState(useFileStore, ["isListing"]),
@@ -153,26 +180,12 @@ const text = computed(() => {
     : t("search.pressToSearch");
 });
 const filteredResults = computed(() => {
-  return results.value.slice(0, resultsCount.value);
+  const page = listPage(route.query.searchPage, results.value.length);
+  return results.value.slice((page - 1) * pageSize, page * pageSize);
 });
 
 const closeButtonTitle = computed(() => {
   return ongoing.value ? t("buttons.stopSearch") : t("buttons.close");
-});
-
-onMounted(() => {
-  if (result.value === null) {
-    return;
-  }
-  result.value.addEventListener("scroll", (event: Event) => {
-    if (
-      (event.target as HTMLElement).offsetHeight +
-        (event.target as HTMLElement).scrollTop >=
-      (event.target as HTMLElement).scrollHeight - 100
-    ) {
-      resultsCount.value += 50;
-    }
-  });
 });
 
 onUnmounted(() => {
@@ -210,7 +223,6 @@ const init = (string: string) => {
 const reset = () => {
   abortLastSearch();
   ongoing.value = false;
-  resultsCount.value = 50;
   results.value = [];
 };
 
@@ -225,6 +237,20 @@ const submit = async (event: Event) => {
     return;
   }
 
+  if (route.query.q === prompt.value) {
+    await runSearch();
+  } else {
+    await router.push({
+      path: route.path,
+      query: {
+        ...listQuery(route.query, { q: prompt.value }),
+        searchPage: undefined,
+      },
+    });
+  }
+};
+
+const runSearch = async () => {
   let path = route.path;
   if (!fileStore.isListing) {
     path = url.removeLastDir(path) + "/";
@@ -248,4 +274,19 @@ const submit = async (event: Event) => {
 
   ongoing.value = false;
 };
+watch(
+  () => route.query.q,
+  async (value) => {
+    if (typeof value === "string" && value) {
+      prompt.value = value;
+      if (layoutStore.currentPromptName !== "search")
+        layoutStore.showHover("search");
+      await nextTick();
+      await runSearch();
+    } else if (active.value) {
+      layoutStore.closeHovers();
+    }
+  },
+  { immediate: true }
+);
 </script>

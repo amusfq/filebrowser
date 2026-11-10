@@ -105,9 +105,12 @@ onUnmounted(() => {
   fetchDataController.abort();
 });
 
-watch(route, () => {
-  fetchData();
-});
+watch(
+  () => route.path.replace(/\/$/, ""),
+  () => {
+    fetchData();
+  }
+);
 watch(reload, (newValue) => {
   newValue && fetchData();
 });

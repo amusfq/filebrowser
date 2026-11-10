@@ -1,8 +1,56 @@
 <template>
-  <div>
+  <div class="finder-files">
     <header-bar showMenu showLogo>
+      <div
+        class="finder-view-switch"
+        role="tablist"
+        :aria-label="t('finder.view')"
+      >
+        <button
+          v-for="(view, index) in finderViews"
+          :key="view.key"
+          class="finder-tool"
+          role="tab"
+          :aria-selected="viewMode === view.mode"
+          :tabindex="viewMode === view.mode ? 0 : -1"
+          :aria-label="t('finder.' + view.key)"
+          :title="t('finder.' + view.key)"
+          @click="setView(view.mode)"
+          @keydown.right.prevent="cycleView($event, index, 1)"
+          @keydown.left.prevent="cycleView($event, index, -1)"
+        >
+          <FinderIcon :name="view.icon" />
+        </button>
+      </div>
+      <div class="finder-toolbar-divider" />
+      <button
+        v-if="authStore.user?.perm.create"
+        class="finder-tool"
+        :aria-label="t('sidebar.newFolder')"
+        :title="t('sidebar.newFolder')"
+        @click="layoutStore.showHover('newDir')"
+      >
+        <FinderIcon name="newFolder" />
+      </button>
+      <button
+        v-if="headerButtons.share"
+        class="finder-tool"
+        :aria-label="t('buttons.share')"
+        :title="t('buttons.share')"
+        @click="layoutStore.showHover('share')"
+      >
+        <FinderIcon name="share" />
+      </button>
+      <button
+        v-if="headerButtons.upload"
+        class="finder-tool finder-upload"
+        :aria-label="t('buttons.upload')"
+        :title="t('buttons.upload')"
+        @click="uploadFunc"
+      >
+        <FinderIcon name="upload" />
+      </button>
       <search />
-      <title />
       <action
         class="search-button"
         icon="search"
@@ -159,16 +207,42 @@
           multiple
         />
       </div>
+      <section
+        v-if="viewMode === 'mosaic gallery' && galleryItem"
+        class="finder-gallery-preview"
+        :aria-label="t('buttons.info')"
+      >
+        <img
+          v-if="galleryItem.type === 'image' && enableThumbs"
+          :src="api.getPreviewURL(galleryItem, 'big')"
+          :alt="galleryItem.name"
+        />
+        <FinderFileIcon
+          v-else
+          :isDir="galleryItem.isDir"
+          :name="galleryItem.name"
+          :type="galleryItem.type"
+        />
+        <strong>{{ galleryItem.name }}</strong>
+        <span>{{
+          galleryItem.isDir ? t("files.folders") : filesize(galleryItem.size)
+        }}</span>
+      </section>
       <div
-        v-else
+        v-if="fileStore.req?.items.length"
         id="listing"
         ref="listing"
         class="file-icons"
         data-clear-on-click="true"
-        :class="authStore.user?.viewMode ?? ''"
+        :class="viewMode"
         @click="handleEmptyAreaClick"
       >
-        <div>
+        <FinderColumns
+          v-if="viewMode === 'columns'"
+          :items="pageItems"
+          @contextmenu="showContextMenu"
+        />
+        <div v-show="viewMode !== 'columns'">
           <div class="item header">
             <div>
               <p
@@ -177,6 +251,8 @@
                 role="button"
                 tabindex="0"
                 @click="sort('name')"
+                @keydown.enter.prevent="sort('name')"
+                @keydown.space.prevent="sort('name')"
                 :title="t('files.sortByName')"
                 :aria-label="t('files.sortByName')"
               >
@@ -190,6 +266,8 @@
                 role="button"
                 tabindex="0"
                 @click="sort('size')"
+                @keydown.enter.prevent="sort('size')"
+                @keydown.space.prevent="sort('size')"
                 :title="t('files.sortBySize')"
                 :aria-label="t('files.sortBySize')"
               >
@@ -202,6 +280,8 @@
                 role="button"
                 tabindex="0"
                 @click="sort('modified')"
+                @keydown.enter.prevent="sort('modified')"
+                @keydown.space.prevent="sort('modified')"
                 :title="t('files.sortByLastModified')"
                 :aria-label="t('files.sortByLastModified')"
               >
@@ -212,11 +292,14 @@
           </div>
         </div>
 
-        <h2 data-clear-on-click="true" v-if="fileStore.req?.numDirs ?? false">
+        <h2
+          data-clear-on-click="true"
+          v-if="viewMode !== 'columns' && (fileStore.req?.numDirs ?? false)"
+        >
           {{ t("files.folders") }}
         </h2>
         <div
-          v-if="fileStore.req?.numDirs ?? false"
+          v-if="viewMode !== 'columns' && (fileStore.req?.numDirs ?? false)"
           data-clear-on-click="true"
           @contextmenu="showContextMenu"
         >
@@ -235,11 +318,14 @@
           </item>
         </div>
 
-        <h2 data-clear-on-click="true" v-if="fileStore.req?.numFiles ?? false">
+        <h2
+          data-clear-on-click="true"
+          v-if="viewMode !== 'columns' && (fileStore.req?.numFiles ?? false)"
+        >
           {{ t("files.files") }}
         </h2>
         <div
-          v-if="fileStore.req?.numFiles ?? false"
+          v-if="viewMode !== 'columns' && (fileStore.req?.numFiles ?? false)"
           data-clear-on-click="true"
           @contextmenu="showContextMenu"
         >
@@ -336,6 +422,10 @@
         </div>
       </div>
     </template>
+    <FinderStatus
+      :total="fileStore.req?.items.length || 0"
+      :selected="fileStore.selectedCount"
+    />
   </div>
 </template>
 
@@ -346,37 +436,36 @@ import { useFileStore } from "@/stores/file";
 import { useLayoutStore } from "@/stores/layout";
 
 import { users, files as api } from "@/api";
-import { enableExec } from "@/utils/constants";
+import FinderFileIcon from "@/components/files/FinderFileIcon.vue";
+import { filesize } from "@/utils";
+import { enableExec, enableThumbs } from "@/utils/constants";
 import * as upload from "@/utils/upload";
 import buttons from "@/utils/buttons";
-import css from "@/utils/css";
 import { throttle } from "lodash-es";
 import { Base64 } from "js-base64";
 
+import FinderIcon from "@/components/FinderIcon.vue";
+import FinderColumns from "@/components/files/FinderColumns.vue";
+import FinderStatus from "@/components/files/FinderStatus.vue";
+import {
+  finderView,
+  finderViews,
+  listPage,
+  listQuery,
+  pageSize,
+} from "@/utils/finder";
 import HeaderBar from "@/components/header/HeaderBar.vue";
 import Action from "@/components/header/Action.vue";
 import Search from "@/components/Search.vue";
 import Item from "@/components/files/ListingItem.vue";
 import ContextMenu from "@/components/ContextMenu.vue";
-import {
-  computed,
-  inject,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  watch,
-} from "vue";
-import { useRoute, onBeforeRouteUpdate } from "vue-router";
+import { computed, inject, onBeforeUnmount, onMounted, ref } from "vue";
+import { useRoute, useRouter, onBeforeRouteUpdate } from "vue-router";
 import { useI18n } from "vue-i18n";
-import { storeToRefs } from "pinia";
 import { removePrefix } from "@/api/utils";
 
-const showLimit = ref<number>(50);
-const columnWidth = ref<number>(280);
 const dragCounter = ref<number>(0);
 const width = ref<number>(window.innerWidth);
-const itemWeight = ref<number>(0);
 const isContextMenuVisible = ref<boolean>(false);
 const contextMenuPos = ref<{ x: number; y: number }>({ x: 0, y: 0 });
 
@@ -387,9 +476,35 @@ const authStore = useAuthStore();
 const fileStore = useFileStore();
 const layoutStore = useLayoutStore();
 
-const { req } = storeToRefs(fileStore);
-
 const route = useRoute();
+const router = useRouter();
+const viewMode = computed(() =>
+  finderView(route.query, authStore.user?.viewMode || "mosaic")
+);
+const page = computed(() =>
+  listPage(route.query.page, fileStore.req?.items.length || 0)
+);
+const pageItems = computed(() => {
+  const all = fileStore.req?.items || [];
+  const ordered = [
+    ...all.filter((item) => item.isDir),
+    ...all.filter((item) => !item.isDir),
+  ];
+  return ordered.slice((page.value - 1) * pageSize, page.value * pageSize);
+});
+const galleryItem = computed(
+  () => fileStore.req?.items[fileStore.selected[0]] || pageItems.value[0]
+);
+const setView = (mode: ReturnType<typeof finderView>) => {
+  const view = finderViews.find((view) => view.mode === mode)!;
+  router.push({ path: route.path, query: { ...route.query, view: view.key } });
+};
+const cycleView = (event: KeyboardEvent, index: number, direction: number) => {
+  const next = (index + direction + finderViews.length) % finderViews.length;
+  setView(finderViews[next].mode);
+  const group = (event.currentTarget as HTMLElement).parentElement;
+  (group?.children[next] as HTMLElement)?.focus();
+};
 onBeforeRouteUpdate(() => {
   hideContextMenu();
 });
@@ -414,30 +529,12 @@ const ascOrdered = computed(() =>
   fileStore.req ? fileStore.req.sorting.asc : false
 );
 
-const dirs = computed(() => items.value.dirs.slice(0, showLimit.value));
-
-const items = computed(() => {
-  const dirs: any[] = [];
-  const files: any[] = [];
-
-  fileStore.req?.items.forEach((item) => {
-    if (item.isDir) {
-      dirs.push(item);
-    } else {
-      files.push(item);
-    }
-  });
-
-  return { dirs, files };
-});
-
-const files = computed((): Resource[] => {
-  let _showLimit = showLimit.value - items.value.dirs.length;
-
-  if (_showLimit < 0) _showLimit = 0;
-
-  return items.value.files.slice(0, _showLimit);
-});
+const items = computed(() => ({
+  dirs: pageItems.value.filter((item) => item.isDir),
+  files: pageItems.value.filter((item) => !item.isDir),
+}));
+const dirs = computed(() => items.value.dirs);
+const files = computed(() => items.value.files);
 
 const nameIcon = computed(() => {
   if (nameSorted.value && !ascOrdered.value) {
@@ -465,13 +562,12 @@ const modifiedIcon = computed(() => {
 
 const viewIcon = computed(() => {
   const icons = {
+    columns: "view_column",
     list: "view_module",
     mosaic: "grid_view",
     "mosaic gallery": "view_list",
   };
-  return authStore.user === null
-    ? icons["list"]
-    : icons[authStore.user.viewMode];
+  return authStore.user === null ? icons["list"] : icons[viewMode.value];
 });
 
 const headerButtons = computed(() => {
@@ -494,39 +590,9 @@ const isMobile = computed(() => {
   return width.value <= 736;
 });
 
-watch(req, () => {
-  // Reset the show value
-  showLimit.value = 50;
-
-  nextTick(() => {
-    // Ensures that the listing is displayed
-    // How much every listing item affects the window height
-    setItemWeight();
-
-    // Scroll to the item opened previously
-    if (!revealPreviousItem()) {
-      // Fill and fit the window with listing items
-      fillWindow(true);
-    }
-  });
-});
-
 onMounted(() => {
-  // Check the columns size for the first time.
-  columnsResize();
-
-  // How much every listing item affects the window height
-  setItemWeight();
-
-  // Scroll to the item opened previously
-  if (!revealPreviousItem()) {
-    // Fill and fit the window with listing items
-    fillWindow(true);
-  }
-
   // Add the needed event listeners to the window and document.
   window.addEventListener("keydown", keyEvent);
-  window.addEventListener("scroll", scrollEvent);
   window.addEventListener("resize", windowsResize);
 
   if (!authStore.user?.perm.create) return;
@@ -539,7 +605,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   // Remove event listeners before destroying this page.
   window.removeEventListener("keydown", keyEvent);
-  window.removeEventListener("scroll", scrollEvent);
   window.removeEventListener("resize", windowsResize);
 
   if (authStore.user && !authStore.user?.perm.create) return;
@@ -552,6 +617,8 @@ onBeforeUnmount(() => {
 const base64 = (name: string) => Base64.encodeURI(name);
 
 const keyEvent = (event: KeyboardEvent) => {
+  const target = event.target as HTMLElement;
+  if (target.closest("input, textarea, select, [contenteditable=true]")) return;
   // No prompts are shown
   if (layoutStore.currentPrompt !== null) {
     return;
@@ -732,39 +799,6 @@ const paste = async (event: Event) => {
 
   action(false, false);
 };
-
-const columnsResize = () => {
-  // Update the columns size based on the window width.
-  const items_ = css(["#listing.mosaic .item", ".mosaic#listing .item"]);
-  if (items_ === null) return;
-
-  let columns = Math.floor(
-    (document.querySelector("main")?.offsetWidth ?? 0) / columnWidth.value
-  );
-  if (columns === 0) columns = 1;
-  items_.style.width = `calc(${100 / columns}% - 1em)`;
-};
-
-const scrollEvent = throttle(() => {
-  const totalItems =
-    (fileStore.req?.numDirs ?? 0) + (fileStore.req?.numFiles ?? 0);
-
-  // All items are displayed
-  if (showLimit.value >= totalItems) return;
-
-  const currentPos = window.innerHeight + window.scrollY;
-
-  // Trigger at the 75% of the window height
-  const triggerPos = document.body.offsetHeight - window.innerHeight * 0.25;
-
-  if (currentPos > triggerPos) {
-    // Quantity of items needed to fill 2x of the window height
-    const showQuantity = Math.ceil((window.innerHeight * 2) / itemWeight.value);
-
-    // Increase the number of displayed items
-    showLimit.value += showQuantity;
-  }
-}, 100);
 
 const dragEnter = () => {
   dragCounter.value++;
@@ -958,6 +992,7 @@ const sort = async (by: string) => {
     $showError(e);
   }
 
+  await router.replace({ path: route.path, query: listQuery(route.query, {}) });
   fileStore.reload = true;
 };
 
@@ -971,17 +1006,7 @@ const toggleMultipleSelection = () => {
 };
 
 const windowsResize = throttle(() => {
-  columnsResize();
   width.value = window.innerWidth;
-
-  // Listing element is not displayed
-  if (listing.value == null) return;
-
-  // How much every listing item affects the window height
-  setItemWeight();
-
-  // Fill but not fit the window
-  fillWindow();
 }, 100);
 
 const download = () => {
@@ -1015,27 +1040,10 @@ const download = () => {
   });
 };
 
-const switchView = async () => {
+const switchView = () => {
+  const index = finderViews.findIndex((view) => view.mode === viewMode.value);
+  setView(finderViews[(index + 1) % finderViews.length].mode);
   layoutStore.closeHovers();
-
-  const modes = {
-    list: "mosaic",
-    mosaic: "mosaic gallery",
-    "mosaic gallery": "list",
-  };
-
-  const data = {
-    id: authStore.user?.id,
-    viewMode: (modes[authStore.user?.viewMode ?? "list"] ||
-      "list") as ViewModeType,
-  };
-
-  users.update(data, ["viewMode"]).catch($showError);
-
-  authStore.updateUser(data);
-
-  setItemWeight();
-  fillWindow();
 };
 
 const uploadFunc = () => {
@@ -1047,56 +1055,6 @@ const uploadFunc = () => {
   } else {
     document.getElementById("upload-input")?.click();
   }
-};
-
-const setItemWeight = () => {
-  // Listing element is not displayed
-  if (listing.value === null || fileStore.req === null) return;
-
-  let itemQuantity = fileStore.req.numDirs + fileStore.req.numFiles;
-  if (itemQuantity > showLimit.value) itemQuantity = showLimit.value;
-
-  // How much every listing item affects the window height
-  itemWeight.value = listing.value.offsetHeight / itemQuantity;
-};
-
-const fillWindow = (fit = false) => {
-  if (fileStore.req === null) return;
-
-  const totalItems = fileStore.req.numDirs + fileStore.req.numFiles;
-
-  // More items are displayed than the total
-  if (showLimit.value >= totalItems && !fit) return;
-
-  const windowHeight = window.innerHeight;
-
-  // Quantity of items needed to fill 2x of the window height
-  const showQuantity = Math.ceil(
-    (windowHeight + windowHeight * 2) / itemWeight.value
-  );
-
-  // Less items to display than current
-  if (showLimit.value > showQuantity && !fit) return;
-
-  // Set the number of displayed items
-  showLimit.value = showQuantity > totalItems ? totalItems : showQuantity;
-};
-
-const revealPreviousItem = () => {
-  if (!fileStore.req || !fileStore.oldReq) return;
-
-  const index = fileStore.selected[0];
-  if (index === undefined) return;
-
-  showLimit.value =
-    index + Math.ceil((window.innerHeight * 2) / itemWeight.value);
-
-  nextTick(() => {
-    const items = document.querySelectorAll("#listing .item");
-    items[index].scrollIntoView({ block: "center" });
-  });
-
-  return true;
 };
 
 const showContextMenu = (event: MouseEvent) => {
@@ -1123,7 +1081,7 @@ const handleEmptyAreaClick = (e: MouseEvent) => {
 </script>
 <style scoped>
 #listing {
-  min-height: calc(100vh - 8rem);
+  min-height: calc(100vh - 160px);
 }
 
 .file-selection-margin-bottom {

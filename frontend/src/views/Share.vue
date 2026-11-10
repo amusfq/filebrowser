@@ -246,7 +246,7 @@
           </div>
           <div id="listing" class="list file-icons">
             <item
-              v-for="item in req.items.slice(0, showLimit)"
+              v-for="item in visibleItems"
               :key="base64(item.name)"
               v-bind:index="item.index"
               v-bind:name="item.name"
@@ -258,16 +258,6 @@
               readOnly
             >
             </item>
-            <div
-              v-if="req.items.length > showLimit"
-              class="item"
-              @click="showLimit += 100"
-            >
-              <div>
-                <p class="name">+ {{ req.items.length - showLimit }}</p>
-              </div>
-            </div>
-
             <div
               :class="{ active: fileStore.multiple }"
               id="multiple-selection"
@@ -297,6 +287,11 @@
         </div>
       </div>
     </div>
+    <FinderStatus
+      v-if="req?.isDir"
+      :total="req.items.length"
+      :selected="fileStore.selectedCount"
+    />
   </div>
 </template>
 
@@ -306,6 +301,8 @@ import { filesize } from "@/utils";
 import dayjs from "dayjs";
 import { Base64 } from "js-base64";
 import { createURL } from "@/api/utils";
+import FinderStatus from "@/components/files/FinderStatus.vue";
+import { listPage, pageSize } from "@/utils/finder";
 import HeaderBar from "@/components/header/HeaderBar.vue";
 import Action from "@/components/header/Action.vue";
 import Breadcrumbs from "@/components/Breadcrumbs.vue";
@@ -321,7 +318,6 @@ import { StatusError } from "@/api/utils";
 import { copy } from "@/utils/clipboard";
 
 const error = ref<StatusError | null>(null);
-const showLimit = ref<number>(100);
 const password = ref<string>("");
 const attemptedPasswordLogin = ref<boolean>(false);
 const hash = ref<string>("");
@@ -338,12 +334,19 @@ const route = useRoute();
 const fileStore = useFileStore();
 const layoutStore = useLayoutStore();
 
-watch(route, () => {
-  showLimit.value = 100;
-  fetchData();
-});
+watch(
+  () => route.path,
+  () => {
+    fetchData();
+  }
+);
 
 const req = computed(() => fileStore.req);
+const visibleItems = computed(() => {
+  const items = req.value?.items || [];
+  const page = listPage(route.query.page, items.length);
+  return items.slice((page - 1) * pageSize, page * pageSize);
+});
 
 // Define computes
 

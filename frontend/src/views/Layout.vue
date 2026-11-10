@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="finder-shell">
     <div v-if="uploadStore.totalBytes" class="progress">
       <div
         v-bind:style="{
@@ -44,11 +44,20 @@ const sentPercent = computed(() =>
   ((uploadStore.sentBytes / uploadStore.totalBytes) * 100).toFixed(2)
 );
 
-watch(route, () => {
-  fileStore.selected = [];
-  fileStore.multiple = false;
-  if (layoutStore.currentPromptName !== "success") {
-    layoutStore.closeHovers();
+watch(
+  () => route.path,
+  () => {
+    fileStore.selected = [];
+    fileStore.multiple = false;
+    if (layoutStore.currentPromptName !== "success") {
+      layoutStore.closeHovers();
+    }
   }
-});
+);
+watch(
+  () => route.query.page,
+  () => {
+    fileStore.selected = [];
+  }
+);
 </script>

@@ -8,6 +8,8 @@
     @dragover="dragOver"
     @drop="drop"
     @click="itemClick"
+    @keydown.enter.prevent="open"
+    @keydown.space.prevent="click"
     @mousedown="handleMouseDown"
     @mouseup="handleMouseUp"
     @mouseleave="handleMouseLeave"
@@ -28,7 +30,7 @@
         v-lazy="thumbnailUrl"
         :alt="name"
       />
-      <i v-else class="material-icons"></i>
+      <FinderFileIcon v-else :isDir="isDir" :name="name" :type="type" />
     </div>
 
     <div>
@@ -46,6 +48,7 @@
 
 <script setup lang="ts">
 import { useAuthStore } from "@/stores/auth";
+import FinderFileIcon from "@/components/files/FinderFileIcon.vue";
 import { useFileStore } from "@/stores/file";
 import { useLayoutStore } from "@/stores/layout";
 
@@ -55,7 +58,7 @@ import dayjs from "dayjs";
 import { files as api } from "@/api";
 import * as upload from "@/utils/upload";
 import { computed, inject, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 const touches = ref<number>(0);
 
@@ -67,6 +70,7 @@ const moveThreshold = ref<number>(10);
 
 const $showError = inject<IToastError>("$showError")!;
 const router = useRouter();
+const route = useRoute();
 
 const props = defineProps<{
   name: string;
@@ -326,7 +330,7 @@ const click = (event: Event | KeyboardEvent) => {
 };
 
 const open = () => {
-  router.push({ path: props.url });
+  router.push({ path: props.url, query: { ...route.query, page: undefined } });
 };
 
 const getExtension = (fileName: string): string => {

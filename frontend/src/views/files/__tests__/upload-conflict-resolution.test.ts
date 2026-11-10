@@ -61,7 +61,8 @@ vi.mock("@/components/Search.vue", () => ({ default: {} }));
 vi.mock("@/components/files/ListingItem.vue", () => ({ default: {} }));
 vi.mock("@/components/ContextMenu.vue", () => ({ default: {} }));
 vi.mock("vue-router", () => ({
-  useRoute: () => ({ path: "/files/target/" }),
+  useRoute: () => ({ path: "/files/target/", query: {} }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   onBeforeRouteUpdate: vi.fn(),
 }));
 vi.mock("vue-i18n", async (importOriginal) => ({

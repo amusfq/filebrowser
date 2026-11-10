@@ -308,5 +308,27 @@
     "minutes": "Minutes",
     "seconds": "Seconds",
     "unit": "Time Unit"
+  },
+  "finder": {
+    "back": "Go back",
+    "forward": "Go forward",
+    "location": "On this server",
+    "favorites": "Favorites",
+    "locations": "Locations",
+    "actions": "Actions",
+    "icons": "Icons",
+    "list": "List",
+    "gallery": "Gallery",
+    "items": "{count} items",
+    "selected": "{count} of {total} selected",
+    "page": "Page {page} of {total}",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "view": "View",
+    "newFolder": "New Folder",
+    "shared": "Shared links",
+    "columns": "Columns",
+    "parentFolder": "Parent folder",
+    "parentUnavailable": "Unable to load the parent folder"
   }
 }

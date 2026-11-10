@@ -2,7 +2,7 @@
   <div class="breadcrumbs">
     <component
       :is="element"
-      :to="base || ''"
+      :to="{ path: base || '', query: { ...route.query, page: undefined } }"
       :aria-label="t('files.home')"
       :title="t('files.home')"
     >
@@ -13,7 +13,11 @@
       <span class="chevron"
         ><i class="material-icons">keyboard_arrow_right</i></span
       >
-      <component :is="element" :to="link.url">{{ link.name }}</component>
+      <component
+        :is="element"
+        :to="{ path: link.url, query: { ...route.query, page: undefined } }"
+        >{{ link.name }}</component
+      >
     </span>
   </div>
 </template>

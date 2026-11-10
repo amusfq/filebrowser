@@ -5,7 +5,7 @@
       <div class="card">
         <div class="card-title">
           <h2>{{ t("settings.users") }}</h2>
-          <router-link to="/settings/users/new"
+          <router-link :to="{ path: '/settings/users/new', query: route.query }"
             ><button class="button">
               {{ t("buttons.new") }}
             </button></router-link
@@ -21,7 +21,7 @@
               <th></th>
             </tr>
 
-            <tr v-for="user in users" :key="user.id">
+            <tr v-for="user in visibleItems" :key="user.id">
               <td>{{ user.username }}</td>
               <td>
                 <i v-if="user.perm.admin" class="material-icons">done</i
@@ -29,7 +29,11 @@
               </td>
               <td>{{ user.scope }}</td>
               <td class="small">
-                <router-link :to="'/settings/users/' + user.id"
+                <router-link
+                  :to="{
+                    path: '/settings/users/' + user.id,
+                    query: route.query,
+                  }"
                   ><i class="material-icons">mode_edit</i></router-link
                 >
               </td>
@@ -38,19 +42,28 @@
         </div>
       </div>
     </div>
+    <FinderStatus :total="users.length" />
   </div>
 </template>
 
 <script setup lang="ts">
+import { useRoute } from "vue-router";
+import FinderStatus from "@/components/files/FinderStatus.vue";
+import { listPage, pageSize } from "@/utils/finder";
 import { useLayoutStore } from "@/stores/layout";
 import { users as api } from "@/api";
 import Errors from "@/views/Errors.vue";
-import { onMounted, ref } from "vue";
+import { onMounted, ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { StatusError } from "@/api/utils";
 
+const route = useRoute();
 const error = ref<StatusError | null>(null);
 const users = ref<IUser[]>([]);
+const visibleItems = computed(() => {
+  const page = listPage(route.query.page, users.value.length);
+  return users.value.slice((page - 1) * pageSize, page * pageSize);
+});
 
 const layoutStore = useLayoutStore();
 const { t } = useI18n();

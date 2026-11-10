@@ -7,6 +7,14 @@ on:
     tags:
       - "v*"
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: filebrowser-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   lint-frontend:
@@ -68,8 +76,14 @@ jobs:
       - run: go test --race ./...
 
   build:
-    name: Build
-    runs-on: ubuntu-latest
+    name: Build and deploy ARM64 image
+    needs: [lint-frontend, test-frontend, lint-backend, test]
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    env:
+      CGO_ENABLED: "0"
     steps:
       - uses: actions/checkout@v6
         with:
@@ -88,6 +102,44 @@ jobs:
       - name: Install Task
         uses: go-task/setup-task@v2
       - run: task build
+      - name: Image tags
+        id: image
+        run: |
+          echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          echo "sha=sha-${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+      - name: Set up Docker Buildx
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+        uses: docker/setup-buildx-action@v4
+      - name: Log in to GHCR
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish image
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          platforms: linux/arm64
+          tags: |
+            ${{ steps.image.outputs.name }}:latest
+            ${{ steps.image.outputs.name }}:${{ steps.image.outputs.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+      - name: Deploy to Dokploy
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+        # Store the deployment webhook, not a notification webhook, in this secret.
+        # Dokploy owns runtime settings and volumes, and pulls :latest after publication.
+        env:
+          DOKPLOY_WEBHOOK_URL: ${{ secrets.DOKPLOY_WEBHOOK_URL }}
+        run: |
+          test -n "$DOKPLOY_WEBHOOK_URL"
+          curl --fail-with-body --silent --show-error --retry 3 --retry-all-errors --connect-timeout 15 --max-time 120 --request POST "$DOKPLOY_WEBHOOK_URL"
 
   release:
     name: Release

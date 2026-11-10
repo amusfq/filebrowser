@@ -15,6 +15,7 @@ import { useAuthStore } from "@/stores/auth";
 import { baseURL, name } from "@/utils/constants";
 import i18n from "@/i18n";
 import { recaptcha, loginPage } from "@/utils/constants";
+import { settingsLocation } from "@/utils/finder";
 import { login, validateLogin } from "@/utils/auth";
 
 const titles = {
@@ -181,6 +182,9 @@ const router = createRouter({
 });
 
 router.beforeResolve(async (to, from) => {
+  const settings = settingsLocation(to.path, to.query);
+  if (settings) return settings;
+
   const title = i18n.global.t(titles[to.name as keyof typeof titles]);
   document.title = title + " - " + name;
 

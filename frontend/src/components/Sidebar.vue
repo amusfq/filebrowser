@@ -1,116 +1,124 @@
 <template>
-  <div v-show="active" @click="closeHovers" class="overlay"></div>
-  <nav :class="{ active }">
+  <div
+    v-show="active"
+    @click="closeHovers"
+    class="overlay finder-sidebar-overlay"
+  ></div>
+  <nav
+    class="finder-sidebar"
+    :class="{ active }"
+    :aria-label="$t('buttons.toggleSidebar')"
+  >
+    <div class="finder-sidebar-title">
+      <div class="finder-traffic-lights" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+      <span class="finder-brand">File Browser</span>
+    </div>
     <template v-if="isLoggedIn">
-      <button @click="toAccountSettings" class="action">
-        <i class="material-icons">person</i>
-        <span>{{ user.username }}</span>
-      </button>
-      <button
-        class="action"
-        @click="toRoot"
-        :aria-label="$t('sidebar.myFiles')"
-        :title="$t('sidebar.myFiles')"
-      >
-        <i class="material-icons">folder</i>
-        <span>{{ $t("sidebar.myFiles") }}</span>
-      </button>
-
-      <div v-if="user.perm.create">
+      <section class="finder-sidebar-section">
+        <h2>{{ $t("finder.favorites") }}</h2>
         <button
-          @click="showHover('newDir')"
           class="action"
-          :aria-label="$t('sidebar.newFolder')"
-          :title="$t('sidebar.newFolder')"
+          :class="{ 'finder-current': $route.path.startsWith('/files') }"
+          @click="toRoot"
+          :title="$t('sidebar.myFiles')"
         >
-          <i class="material-icons">create_new_folder</i>
-          <span>{{ $t("sidebar.newFolder") }}</span>
+          <FinderIcon name="folder" /><span>{{ $t("sidebar.myFiles") }}</span>
         </button>
-
         <button
-          @click="showHover('newFile')"
+          v-if="user.perm.share"
           class="action"
-          :aria-label="$t('sidebar.newFile')"
-          :title="$t('sidebar.newFile')"
+          :class="{ 'finder-current': $route.path === '/settings/shares' }"
+          @click="toShares"
         >
-          <i class="material-icons">note_add</i>
-          <span>{{ $t("sidebar.newFile") }}</span>
+          <FinderIcon name="share" /><span>{{ $t("finder.shared") }}</span>
         </button>
-      </div>
-
-      <div v-if="user.perm.admin">
         <button
           class="action"
+          :class="{ 'finder-current': $route.path === '/settings/profile' }"
+          @click="toAccountSettings"
+        >
+          <FinderIcon name="home" /><span>{{ user.username }}</span>
+        </button>
+      </section>
+      <section class="finder-sidebar-section">
+        <h2>{{ $t("finder.locations") }}</h2>
+        <button class="action" @click="toRoot">
+          <FinderIcon name="server" /><span>{{ serverName }}</span>
+        </button>
+        <button
+          v-if="user.perm.admin"
+          class="action"
+          :class="{
+            'finder-current':
+              $route.path.startsWith('/settings') &&
+              !['/settings/profile', '/settings/shares'].includes($route.path),
+          }"
           @click="toGlobalSettings"
-          :aria-label="$t('sidebar.settings')"
-          :title="$t('sidebar.settings')"
         >
-          <i class="material-icons">settings_applications</i>
-          <span>{{ $t("sidebar.settings") }}</span>
+          <FinderIcon name="settings" /><span>{{
+            $t("sidebar.settings")
+          }}</span>
         </button>
+      </section>
+      <section
+        v-if="user.perm.create && isFiles"
+        class="finder-sidebar-section"
+      >
+        <h2>{{ $t("finder.actions") }}</h2>
+        <button class="action" @click="showHover('newDir')">
+          <FinderIcon name="newFolder" /><span>{{
+            $t("sidebar.newFolder")
+          }}</span>
+        </button>
+        <button class="action" @click="showHover('newFile')">
+          <FinderIcon name="newFile" /><span>{{ $t("sidebar.newFile") }}</span>
+        </button>
+      </section>
+    </template>
+    <section v-else class="finder-sidebar-section">
+      <router-link v-if="!hideLoginButton" class="action" to="/login"
+        ><FinderIcon name="user" /><span>{{
+          $t("sidebar.login")
+        }}</span></router-link
+      >
+      <router-link v-if="signup" class="action" to="/login"
+        ><FinderIcon name="newFile" /><span>{{
+          $t("sidebar.signup")
+        }}</span></router-link
+      >
+    </section>
+    <div class="finder-sidebar-bottom">
+      <div class="finder-disk" v-if="isFiles && !disableUsedPercentage">
+        <progress-bar :val="usage.usedPercentage" size="small" />
+        <p>
+          {{ $t("sidebar.diskUsed", { used: usage.used, total: usage.total }) }}
+        </p>
       </div>
+      <button class="action" @click="help">
+        <FinderIcon name="help" /><span>{{ $t("sidebar.help") }}</span>
+      </button>
       <button
-        v-if="canLogout"
-        @click="logout"
+        v-if="isLoggedIn && canLogout"
         class="action"
         id="logout"
-        :aria-label="$t('sidebar.logout')"
-        :title="$t('sidebar.logout')"
+        @click="logout"
       >
-        <i class="material-icons">exit_to_app</i>
-        <span>{{ $t("sidebar.logout") }}</span>
+        <FinderIcon name="logout" /><span>{{ $t("sidebar.logout") }}</span>
       </button>
-    </template>
-    <template v-else>
-      <router-link
-        v-if="!hideLoginButton"
-        class="action"
-        to="/login"
-        :aria-label="$t('sidebar.login')"
-        :title="$t('sidebar.login')"
-      >
-        <i class="material-icons">exit_to_app</i>
-        <span>{{ $t("sidebar.login") }}</span>
-      </router-link>
-
-      <router-link
-        v-if="signup"
-        class="action"
-        to="/login"
-        :aria-label="$t('sidebar.signup')"
-        :title="$t('sidebar.signup')"
-      >
-        <i class="material-icons">person_add</i>
-        <span>{{ $t("sidebar.signup") }}</span>
-      </router-link>
-    </template>
-
-    <div
-      class="credits"
-      v-if="isFiles && !disableUsedPercentage"
-      style="width: 90%; margin: 2em 2.5em 3em 2.5em"
-    >
-      <progress-bar :val="usage.usedPercentage" size="small"></progress-bar>
-      <br />
-      {{ $t("sidebar.diskUsed", { used: usage.used, total: usage.total }) }}
-    </div>
-
-    <p class="credits">
-      <span>
-        <span v-if="disableExternal">File Browser</span>
-        <a
+      <p class="finder-version">
+        <span v-if="disableExternal">File Browser</span
+        ><a
           v-else
-          rel="noopener noreferrer"
-          target="_blank"
           href="https://github.com/filebrowser/filebrowser"
+          target="_blank"
+          rel="noopener noreferrer"
           >File Browser</a
         >
-        <span> {{ " " }} {{ version }}</span>
-      </span>
-      <span>
-        <a @click="help">{{ $t("sidebar.help") }}</a>
-      </span>
-    </p>
+        {{ version }}
+      </p>
+    </div>
   </nav>
 </template>
 
@@ -133,6 +141,7 @@ import {
   loginPage,
 } from "@/utils/constants";
 import { files as api } from "@/api";
+import FinderIcon from "@/components/FinderIcon.vue";
 import ProgressBar from "@/components/ProgressBar.vue";
 import prettyBytes from "pretty-bytes";
 
@@ -146,6 +155,7 @@ export default {
   },
   components: {
     ProgressBar,
+    FinderIcon,
   },
   inject: ["$showError"],
   computed: {
@@ -155,6 +165,7 @@ export default {
     active() {
       return this.currentPromptName === "sidebar";
     },
+    serverName: () => window.location.hostname,
     signup: () => signup,
     hideLoginButton: () => hideLoginButton,
     version: () => version,
@@ -189,15 +200,31 @@ export default {
       }
     },
     toRoot() {
-      this.$router.push({ path: "/files" });
+      this.$router.push({
+        path: "/files/",
+        query: { ...this.$route.query, page: undefined, tab: undefined },
+      });
       this.closeHovers();
     },
     toAccountSettings() {
-      this.$router.push({ path: "/settings/profile" });
+      this.$router.push({
+        path: "/settings/profile",
+        query: { ...this.$route.query, page: undefined, tab: "profile" },
+      });
       this.closeHovers();
     },
     toGlobalSettings() {
-      this.$router.push({ path: "/settings/global" });
+      this.$router.push({
+        path: "/settings/global",
+        query: { ...this.$route.query, page: undefined, tab: "global" },
+      });
+      this.closeHovers();
+    },
+    toShares() {
+      this.$router.push({
+        path: "/settings/shares",
+        query: { ...this.$route.query, page: undefined, tab: "shares" },
+      });
       this.closeHovers();
     },
     help() {
@@ -206,9 +233,9 @@ export default {
     logout: auth.logout,
   },
   watch: {
-    $route: {
-      handler(to) {
-        if (to.path.includes("/files")) {
+    "$route.path": {
+      handler(path) {
+        if (path.includes("/files")) {
           this.fetchUsage();
         }
       },
