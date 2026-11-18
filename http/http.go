@@ -81,6 +81,9 @@ func NewHandler(
 
 	api.Handle("/settings", monkey(settingsGetHandler, "")).Methods("GET")
 	api.Handle("/settings", monkey(settingsPutHandler, "")).Methods("PUT")
+	api.Handle("/remote-servers", monkey(remoteServersHandler, "")).Methods("GET", "POST")
+	api.Handle("/remote-servers/{id}", monkey(remoteServersHandler, "")).Methods("DELETE")
+	api.Handle("/remote-servers/{id}/files", monkey(remoteFilesHandler, "")).Methods("GET", "POST")
 
 	api.PathPrefix("/raw").Handler(monkey(rawHandler, "/api/raw")).Methods("GET")
 	api.PathPrefix("/preview/{size}/{path:.*}").

@@ -32,11 +32,13 @@
     <div v-if="showLogo" class="finder-window-title">
       <strong>{{ windowTitle }}</strong>
       <span>{{
-        isShare
-          ? t("finder.shared")
-          : fileStore.isFiles
-            ? t("finder.location")
-            : t("sidebar.settings")
+        isRemote
+          ? t("remote.title")
+          : isShare
+            ? t("finder.shared")
+            : fileStore.isFiles
+              ? t("finder.location")
+              : t("sidebar.settings")
       }}</span>
     </div>
     <slot />
@@ -96,12 +98,15 @@ const { t } = useI18n();
 
 const ifActionsSlot = computed(() => (slots.actions ? true : false));
 const isShare = computed(() => route.path.startsWith("/share/"));
+const isRemote = computed(() => route.name === "Remote");
 const windowTitle = computed(() =>
-  isShare.value
-    ? fileStore.req?.name || t("finder.shared")
-    : fileStore.isFiles
-      ? fileStore.req?.name || t("sidebar.myFiles")
-      : t("sidebar.settings")
+  isRemote.value
+    ? t("remote.title")
+    : isShare.value
+      ? fileStore.req?.name || t("finder.shared")
+      : fileStore.isFiles
+        ? fileStore.req?.name || t("sidebar.myFiles")
+        : t("sidebar.settings")
 );
 const canGoBack = computed(() => {
   void route.fullPath;

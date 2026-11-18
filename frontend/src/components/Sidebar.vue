@@ -47,6 +47,18 @@
         <button class="action" @click="toRoot">
           <FinderIcon name="server" /><span>{{ serverName }}</span>
         </button>
+        <router-link
+          v-if="user.perm.admin"
+          class="action"
+          :class="{ 'finder-current': $route.path === '/remote' }"
+          :to="{
+            path: '/remote',
+            query: { ...$route.query, page: undefined, tab: undefined },
+          }"
+          ><FinderIcon name="server" /><span>{{
+            $t("remote.title")
+          }}</span></router-link
+        >
         <button
           v-if="user.perm.admin"
           class="action"

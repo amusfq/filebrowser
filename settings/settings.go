@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/filebrowser/filebrowser/v2/remote"
 	"github.com/filebrowser/filebrowser/v2/rules"
 )
 
@@ -21,6 +22,7 @@ type AuthMethod string
 
 // Settings contain the main settings of the application.
 type Settings struct {
+	RemoteServers         []remote.Server     `json:"remoteServers,omitempty"`
 	Key                   []byte              `json:"key"`
 	Signup                bool                `json:"signup"`
 	HideLoginButton       bool                `json:"hideLoginButton"`

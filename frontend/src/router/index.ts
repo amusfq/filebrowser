@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import Login from "@/views/Login.vue";
 import Layout from "@/views/Layout.vue";
 import Files from "@/views/Files.vue";
+import Remote from "@/views/Remote.vue";
 import Share from "@/views/Share.vue";
 import Users from "@/views/settings/Users.vue";
 import User from "@/views/settings/User.vue";
@@ -22,6 +23,7 @@ const titles = {
   Login: "sidebar.login",
   Share: "buttons.share",
   Files: "files.files",
+  Remote: "remote.title",
   Settings: "sidebar.settings",
   ProfileSettings: "settings.profileSettings",
   Shares: "settings.shareManagement",
@@ -34,6 +36,12 @@ const titles = {
 };
 
 const routes = [
+  {
+    path: "/remote",
+    component: Layout,
+    meta: { requiresAuth: true, requiresAdmin: true },
+    children: [{ path: "", name: "Remote", component: Remote }],
+  },
   {
     path: "/login",
     name: "Login",

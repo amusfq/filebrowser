@@ -29,6 +29,8 @@ If you keep running File Browser, treat it as unmaintained software:
 
 Documentation on how to install, configure, and build this project lives in [`docs`](docs) in this repository.
 
+Administrators can also add [remote storage over SSH/SFTP](docs/remote-storage.md).
+
 [CONTRIBUTING.md](CONTRIBUTING.md) documents how to build and develop the project, which remains useful to anyone forking it.
 
 ## License
